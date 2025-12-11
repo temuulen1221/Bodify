@@ -1,22 +1,27 @@
 {
   "expo": {
     "name": "Bodify",
-    "slug": "Bodify",
+    "slug": "bodify",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bodify",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera access is needed to perform real-time squat pose detection and count your reps.",
+        "NSMicrophoneUsageDescription": "(Optional) Microphone access would allow future voice or sound feedback features."
+      }
     },
     "android": {
+      "package": "com.yourname.bodify",
+      "permissions": ["CAMERA"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icons/icon/icon/android/mipmap-xxxhdpi/ic_launcher_foreground.png",
+        "backgroundImage": "./assets/icons/icon/icon/android/mipmap-xxxhdpi/ic_launcher.png",
+        "monochromeImage": "./assets/icons/icon/icon/android/mipmap-xxxhdpi/ic_launcher_round.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -38,11 +43,27 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-audio",
+      "expo-video",
+      "expo-web-browser"
     ],
+    "extra": {
+      "stravaClientId": "",
+      "stravaClientSecret": "",
+      "exerciseDbApiKey": "",
+      "exerciseDbApiHost": "exercisedb.p.rapidapi.com",
+      "exerciseDbBaseUrl": "https://exercisedb.p.rapidapi.com",
+      "router": {},
+      "eas": {
+        "projectId": "42c679e1-c672-49c0-a06a-171f5da81de4"
+      }
+    },
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
+      "typedRoutes": true
+    },
+    "owner": "temuulen1221"
   }
 }

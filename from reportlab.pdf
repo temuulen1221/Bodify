@@ -1,0 +1,40 @@
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase import pdfmetrics
+
+pdfmetrics.registerFont(UnicodeCIDFont('HYSMyeongJo-Medium'))
+
+doc = SimpleDocTemplate("Bodify_캡스톤디자인_결과보고서.pdf", pagesize=A4)
+
+styles = getSampleStyleSheet()
+styles.add(ParagraphStyle(name='Korean', fontName='HYSMyeongJo-Medium', fontSize=11, leading=18))
+style = styles['Korean']
+
+content = []
+
+cover = """<para align=center><b>캡스톤디자인 결과 보고서</b></para>
+<para align=center>202510_41001-01</para>
+<para align=center><b>Bodify – 3D 아바타 및 활동 트래킹 기반 개인 맞춤 헬스케어 앱</b></para>
+<para align=center>(Bodify: Personalized 3D Avatar Fitness App)</para>
+<para align=center>지도교수 : 전은솜</para>
+<para align=center>제출일 : 2025년 10월 22일</para>
+<para align=center>조장 : 테무렌</para>
+<para align=center>조원 : 없음</para>
+<para align=center>서울과학기술대학교 정보통신대학 컴퓨터공학과</para>"""
+content.append(Paragraph(cover, style))
+content.append(PageBreak())
+
+body = """1. 캡스톤디자인 개요 – Bodify는 사용자의 신체정보와 활동데이터를 기반으로 3D 아바타와 건강 관리 기능을 제공하는 앱이다.
+<br/><br/>2. 캡스톤디자인 내용 – React Native, Firebase, Three.js, ExerciseDB, Spoonacular API를 활용하여 운동·식단·분석·게임화 기능을 통합하였다.
+<br/><br/>3. 개발 및 운영 환경 – Expo 플랫폼을 기반으로 Android, iOS, Web에서 동작하도록 구현하였다.
+<br/><br/>4. 구현 및 피드백 – 센서 기능과 아바타 렌더링을 완성하고 사용자 피드백으로 UI를 개선하였다.
+<br/><br/>5. 결과와 효과 – 시각적 피드백 및 포인트 시스템으로 운동 습관 형성 효과를 얻었다.
+<br/><br/>6. 개선 희망 사항 – AI 운동 코치, Google Fit 연동, AR 자세 인식 기능을 추가 예정이다.
+<br/><br/>7. 참고 자료 – Expo, Firebase, Three.js, ExerciseDB, Spoonacular API 및 GitHub (https://github.com/temuulen)
+<br/><br/>8. 부록 – 전체 소스코드는 bodify/ 폴더 내 포함되어 있으며 “npm install && expo start” 로 실행 가능."""
+content.append(Paragraph(body, style))
+
+doc.build(content)
+print("✅ Bodify_캡스톤디자인_결과보고서.pdf 생성 완료!")

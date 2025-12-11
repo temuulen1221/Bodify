@@ -1,0 +1,38 @@
+mutation CreateUser @auth(level: USER) {
+  user_insert(data: {
+    email: "example@example.com",
+    username: "exampleUser"
+  })
+}
+
+query ListQuests @auth(level: PUBLIC) {
+  quests {
+    id
+    name
+    description
+    rewardCoins
+  }
+}
+
+mutation EquipAvatarItem($avatarItemId: UUID!) @auth(level: USER) {
+  userAvatarItem_update(
+    key: {
+      userId_expr: "auth.uid"
+      avatarItemId: $avatarItemId
+    }
+    data: {
+      isEquipped: true
+    }
+  )
+}
+
+query GetUserAvatars @auth(level: USER) {
+  avatars(where: { userId_expr: "auth.uid" }) {
+    id
+    name
+    bodyType
+    skinColor
+    expression
+    personalityTrait
+  }
+}

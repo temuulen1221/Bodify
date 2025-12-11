@@ -1,0 +1,51 @@
+type User @table {
+  username: String!
+  email: String!
+  createdAt: Timestamp!
+  lastLogin: Timestamp
+  totalCoins: Int
+}
+
+type Avatar @table {
+  user: User!
+  name: String!
+  bodyType: String!
+  skinColor: String!
+  createdAt: Timestamp!
+  expression: String
+  personalityTrait: String
+}
+
+type AvatarItem @table {
+  name: String!
+  type: String!
+  price: Int!
+  imageUrl: String!
+  description: String
+}
+
+type UserAvatarItem @table(key: ["user", "avatarItem"]) {
+  user: User!
+  avatarItem: AvatarItem!
+  isEquipped: Boolean!
+  purchasedAt: Timestamp!
+}
+
+type Quest @table {
+  name: String!
+  description: String!
+  objective: String!
+  rewardCoins: Int!
+  createdAt: Timestamp!
+  difficulty: String
+  duration: String
+}
+
+type UserQuest @table(key: ["user", "quest"]) {
+  user: User!
+  quest: Quest!
+  status: String!
+  startedAt: Timestamp!
+  completedAt: Timestamp
+  progress: String
+}

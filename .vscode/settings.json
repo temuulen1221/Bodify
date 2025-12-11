@@ -3,5 +3,11 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  // Disable auto configuring CMake; avoid pointing into node_modules.
+  "cmake.configureOnOpen": false,
+  // Keep any accidental configure artifacts isolated.
+  "cmake.buildDirectory": "${workspaceFolder}/.cmake",
+  // Remove previous explicit sourceDirectory pointing to node_modules to prevent errors.
+  "cmake.sourceDirectory": "${workspaceFolder}"
 }

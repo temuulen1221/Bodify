@@ -1,0 +1,44 @@
+mutation SeedData @auth(level: USER) {
+  user_insertMany(data: [
+    {
+      email: "test1@example.com",
+      username: "testuser1",
+      createdAt_expr: "request.time"
+    },
+    {
+      email: "test2@example.com",
+      username: "testuser2",
+      createdAt_expr: "request.time"
+    }
+  ])
+  avatarItem_insertMany(data: [
+    {
+      name: "Sword",
+      imageUrl: "http://example.com/sword.png",
+      price: 10,
+      type: "Weapon"
+    },
+    {
+      name: "Hat",
+      imageUrl: "http://example.com/hat.png",
+      price: 5,
+      type: "Cosmetic"
+    }
+  ])
+  quest_insertMany(data: [
+    {
+      name: "Slay the Dragon",
+      description: "Kill the dragon and save the kingdom",
+      objective: "Kill the Dragon",
+      rewardCoins: 100,
+      createdAt_expr: "request.time"
+    },
+    {
+      name: "Gather Herbs",
+      description: "Collect 10 herbs for the potion",
+      objective: "Collect 10 herbs",
+      rewardCoins: 50,
+      createdAt_expr: "request.time"
+    }
+  ])
+}
