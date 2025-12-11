@@ -195,11 +195,3 @@ If you plan to contribute:
 This repository doesn't include a license file. Add one if you plan to make the code public.
 
 ---
-
-If you'd like, I can also:
-
-- Add a short developer setup section for Android emulator installation on Windows.
-- Add a CONTRIBUTING.md and a minimal LICENSE file.
-- Expand the folder overview into a visual tree.
-
-Tell me which of those you'd like next.
