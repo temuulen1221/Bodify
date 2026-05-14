@@ -21,7 +21,7 @@ export default ({ config }) => ({
       },
     },
     android: {
-      package: 'com.yourname.bodify',
+      package: 'com.temuulen1221.bodify',
       permissions: ['CAMERA'],
       adaptiveIcon: {
         backgroundColor: '#E6F4FE',
