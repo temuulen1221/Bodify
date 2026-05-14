@@ -1,0 +1,3 @@
+[submodule "CharacterStudio"]
+	path = CharacterStudio
+	url = https://github.com/M3-org/CharacterStudio.git
