@@ -1,6 +1,6 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const glowStyles = {
   cyan: {
@@ -60,7 +60,7 @@ export default function RunnerBadgeCompact({
       </View>
       {/* Level icon and number */}
       <View style={[styles.levelBadge, { backgroundColor: colors.backgroundColor, borderColor: colors.borderColor }]}>  
-        <Icon name="trophy-outline" size={24} color={colors.textColor} />
+        <MaterialCommunityIcons name="trophy-outline" size={24} color={colors.textColor} />
         <Text style={[styles.levelText, { color: colors.textColor }]}>{level}</Text>
       </View>
       {/* XP Progress ring */}
@@ -79,7 +79,7 @@ export default function RunnerBadgeCompact({
       </Svg>
       {/* XP indicator */}
       <View style={[styles.xpIndicator, { backgroundColor: colors.backgroundColor, borderColor: colors.borderColor }]}>  
-        <Icon name="lightning-bolt-outline" size={12} color={colors.textColor} />
+        <MaterialCommunityIcons name="lightning-bolt-outline" size={12} color={colors.textColor} />
         <Text style={[styles.xpText, { color: colors.textColor }]}>{Math.round(xpPercentage)}%</Text>
       </View>
       {/* Corner accents */}
