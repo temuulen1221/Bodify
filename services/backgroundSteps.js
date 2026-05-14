@@ -1,11 +1,14 @@
 // Background step tracking using expo-background-fetch and expo-task-manager
 // Runs periodically (OS scheduled) to pull today's step count and persist it.
+// NOTE: expo-background-fetch is deprecated in favour of expo-background-task but
+// migrating requires a native dev-client rebuild. Suppressing the console warning here.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as BackgroundFetch from 'expo-background-fetch';
 import { Pedometer } from 'expo-sensors';
 import * as TaskManager from 'expo-task-manager';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { Platform } from 'react-native';
 import { currentUserId, db } from './firebase';
 
 const TASK_NAME = 'BODIFY_BACKGROUND_STEP_FETCH';
@@ -24,7 +27,8 @@ function startOfToday() {
 TaskManager.defineTask(TASK_NAME, async () => {
   try {
     const available = await Pedometer.isAvailableAsync();
-    if (!available) {
+    // Android does not support getStepCountAsync with date ranges
+    if (!available || Platform.OS === 'android') {
       return BackgroundFetch.BackgroundFetchResult.NoData;
     }
     const res = await Pedometer.getStepCountAsync(startOfToday(), new Date());
@@ -59,9 +63,9 @@ export async function ensureBackgroundStepTaskRegistered() {
     const isRegistered = await TaskManager.isTaskRegisteredAsync(TASK_NAME);
     if (!isRegistered) {
       await BackgroundFetch.registerTaskAsync(TASK_NAME, {
-        minimumInterval: 15 * 60, // 15 minutes on Android, iOS varies
-        stopOnTerminate: false,   // Android: continue after app is killed
-        startOnBoot: true,        // Android: start on device boot
+        minimumInterval: 15 * 60, // 15 minutes in seconds
+        stopOnTerminate: false,
+        startOnBoot: true,
       });
     }
 

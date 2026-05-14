@@ -41,7 +41,7 @@ async function writeTodayToFirestore(dateKey, steps) {
   if (!userId) return;
 
   try {
-    const ref = doc(db, 'users', userId, 'metrics', 'steps', dateKey);
+    const ref = doc(db, 'users', userId, 'steps', dateKey);
     await setDoc(ref, { date: dateKey, steps, updatedAt: serverTimestamp() }, { merge: true });
   } catch (e) {
     console.warn('[stepsService] Firestore sync failed', e?.message || e);
@@ -52,7 +52,7 @@ export async function hydrateRemoteStepsHistory(dispatch, userId) {
   if (!userId) return;
 
   try {
-    const stepsCol = collection(db, 'users', userId, 'metrics', 'steps');
+    const stepsCol = collection(db, 'users', userId, 'steps');
     const snapshot = await getDocs(query(stepsCol, orderBy('date', 'desc'), limit(FIRESTORE_HISTORY_LIMIT)));
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() || {};
@@ -104,7 +104,8 @@ export function startGlobalStepTracking(dispatch) {
       publish(baseTodaySteps + liveSessionSteps);
     }
 
-    if (!pedometerAvailable) return;
+    // Android does not support getStepCountAsync with date ranges; use watchStepCount only
+    if (!pedometerAvailable || Platform.OS === 'android') return;
 
     try {
       const result = await Pedometer.getStepCountAsync(startOfToday(), new Date());

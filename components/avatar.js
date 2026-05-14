@@ -6,7 +6,7 @@
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import { GLView } from 'expo-gl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as THREE from 'three';
 import { getMixamoAnimation } from '../CharacterStudio/src/library/loadMixamoAnimation';
@@ -16,6 +16,7 @@ import '../shims/three-legacy-loaders-shim';
 import { resolveAvatarAnimationConfig } from '../utils/avatarAnimationConfig';
 import { getDefaultAvatarModelId, getLocalAvatarModelModule, resolveAvatarModelSelection } from '../utils/avatarModels';
 import AvatarWeb from './AvatarWeb';
+import AvatarWebView from './AvatarWebView';
 
 const animationClipCache = new Map();
 
@@ -49,7 +50,7 @@ const base64ToUint8Array = (base64) => {
   return new Uint8Array(output);
 };
 
-const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, model, sizeMultiplier = 1.15, xOffset = 0, yOffset = 0, zOffset = 0, alignFootToBottom = false, bottomPadding = 0.05, autoFit = true, headMargin = 0.08, bottomInsetPx = 0, focus = 'chest', fitMode = 'shrink', targetFill = 0.94, footLift = 0, preserveTPose = false, playAnimation = true, animationType = 'idle', animationReplayNonce = 0, animationRepeatCount = 1, onAnimationComplete, onVrmLoad, onManagersReady }) => {
+const Avatar = forwardRef(function Avatar({ height = '175', weight = '70', gender = 'male', photoUri, model, sizeMultiplier = 1.15, xOffset = 0, yOffset = 0, zOffset = 0, alignFootToBottom = false, bottomPadding = 0.05, autoFit = true, headMargin = 0.08, bottomInsetPx = 0, focus = 'chest', fitMode = 'shrink', targetFill = 0.94, footLift = 0, preserveTPose = false, playAnimation = true, animationType = 'idle', animationReplayNonce = 0, animationRepeatCount = 1, onAnimationComplete, onVrmLoad, onManagersReady }, avatarRef) {
   // === HOOKS MUST BE CALLED FIRST, before any conditionals ===
   const cubeRef = useRef(null);
   const rendererRef = useRef(null);
@@ -464,6 +465,19 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
     const originalCreateImageBitmap = global.createImageBitmap;
     global.createImageBitmap = async (_blob) => ({ width: 1, height: 1, close: () => {} });
 
+    // URL.createObjectURL polyfill: Three.js GLTFLoader calls this for embedded (bufferView)
+    // images in GLB/VRM files. On Android/Hermes it's undefined, causing `.match()` on undefined.
+    // Return a 1×1 transparent PNG so the model loads without textures instead of crashing.
+    const _blankPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
+    const originalCreateObjectURL = global.URL ? global.URL.createObjectURL : undefined;
+    const originalRevokeObjectURL = global.URL ? global.URL.revokeObjectURL : undefined;
+    if (global.URL) {
+      // Always override — on Android/Hermes the native implementation exists but returns undefined,
+      // which causes Three.js GLTFLoader to crash with `.match() of undefined`.
+      global.URL.createObjectURL = (_blob) => _blankPng;
+      global.URL.revokeObjectURL = (_url) => {};
+    }
+
     // Helper to normalize materials (convert ShaderMaterial-like to MeshStandardMaterial)
     const normalizeChildMaterials = (child) => {
       if (!child.isMesh || !child.material) return;
@@ -630,7 +644,14 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
     } finally {
       // Restore original constructors (Blob left untouched intentionally)
       if (originalCreateImageBitmap) global.createImageBitmap = originalCreateImageBitmap;
+      else delete global.createImageBitmap;
       if (originalFileReader) global.FileReader = originalFileReader;
+      if (global.URL) {
+        if (typeof originalCreateObjectURL === 'function') global.URL.createObjectURL = originalCreateObjectURL;
+        else delete global.URL.createObjectURL;
+        if (typeof originalRevokeObjectURL === 'function') global.URL.revokeObjectURL = originalRevokeObjectURL;
+        else delete global.URL.revokeObjectURL;
+      }
     }
   }, [gender, model, onVrmLoad, playAnimation, playResolvedClip, updateModelFromProps]);
 
@@ -788,7 +809,25 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
     );
   }
 
+  // On Android, use a WebView-based renderer — the native GL path cannot decode
+  // embedded VRM textures (URL.createObjectURL returns undefined on Hermes).
+  if (Platform.OS === 'android') {
+    return (
+      <AvatarWebView
+        ref={avatarRef}
+        gender={gender}
+        model={model}
+        playAnimation={playAnimation}
+        animationType={animationType}
+        animationReplayNonce={animationReplayNonce}
+        animationRepeatCount={animationRepeatCount}
+        onAnimationComplete={onAnimationComplete}
+        onVrmLoad={onVrmLoad}
+      />
+    );
+  }
+
   return <GLView style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }} onContextCreate={onContextCreate} />;
-};
+});
 
 export default Avatar;

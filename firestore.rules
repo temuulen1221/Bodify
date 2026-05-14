@@ -38,6 +38,11 @@ service cloud.firestore {
       match /metrics/{metricType}/{dateKey} {
         allow read, write: if isOwner(userId);
       }
+
+      // Daily steps — owner only (path: users/{uid}/steps/{dateKey})
+      match /steps/{dateKey} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // ── Friends ────────────────────────────────────────────────────────────

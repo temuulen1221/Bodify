@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -781,12 +781,65 @@ const ProfileScreen = () => {
             </>
           )}
         </View>
+
+        {(() => {
+          const providers = auth.currentUser?.providerData?.map((p) => p.providerId) ?? [];
+          const isGoogle = providers.includes('google.com');
+          const label = isGoogle ? 'Connected with Google' : 'Connected with Email';
+          const icon = isGoogle ? '🔵' : '📧';
+          return (
+            <View style={styles.authProviderRow}>
+              <Text style={styles.authProviderText}>{icon}  {label}</Text>
+            </View>
+          );
+        })()}
+
+        <TouchableOpacity
+          style={styles.signOutButton}
+          onPress={() => signOut(auth)}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  signOutButton: {
+    marginHorizontal: 24,
+    marginTop: 8,
+    marginBottom: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,80,80,0.4)',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,50,50,0.08)',
+  },
+  authProviderRow: {
+    marginHorizontal: 24,
+    marginBottom: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  authProviderText: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
+  signOutText: {
+    color: '#FF5252',
+    fontWeight: '600',
+    fontSize: 15,
+  },
   screen: {
     flex: 1,
     backgroundColor: '#070C18',

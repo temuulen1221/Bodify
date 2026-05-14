@@ -2,7 +2,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack } from "expo-router";
 import { onAuthStateChanged } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { LogBox, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider, useDispatch } from 'react-redux';
 import BadgeLevelUpModal from '../components/BadgeLevelUpModal';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -12,6 +13,11 @@ import { auth } from '../services/firebase';
 import { startGlobalStepTracking } from '../services/stepsService';
 import { loadAwardsState, loadRemoteUserState, loadStepsState, loadUserState, mergeHydratedUserState } from '../services/storage';
 import store, { hydrateQuests, hydrateSteps, hydrateUser, hydrateWorkouts } from '../store';
+
+// Suppress known benign warnings
+LogBox.ignoreLogs([
+  'expo-background-fetch: This library is deprecated',
+]);
 
 const HOME_FRAME_WIDTH = 414;
 
@@ -226,6 +232,7 @@ export default function RootLayout() {
   };
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ErrorBoundary>
     <Provider store={store}>
       <WebMobileFrame>
@@ -262,6 +269,7 @@ export default function RootLayout() {
       </WebMobileFrame>
     </Provider>
     </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
 

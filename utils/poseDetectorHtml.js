@@ -549,16 +549,30 @@ export const buildPoseDetectorHtml = ({
 
 			setStatus('Camera...');
 			const video = document.getElementById('video');
-			const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }).catch((error) => {
-				const message = formatError(error);
-				setStatus(message);
-				setHelp(message);
-				postMsg('error', message);
-				throw error;
-			});
 
-			video.srcObject = stream;
-			await video.play();
+			let currentStream = null;
+			let currentFacingMode = 'user';
+
+			async function startCamera(facingMode) {
+				if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); currentStream = null; }
+				const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: false }).catch((error) => {
+					const message = formatError(error);
+					setStatus(message); setHelp(message); postMsg('error', message);
+					throw error;
+				});
+				currentStream = stream;
+				video.srcObject = stream;
+				video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
+				await video.play();
+				return stream;
+			}
+
+			window.flipCamera = async function() {
+				currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+				try { await startCamera(currentFacingMode); } catch(e) { postMsg('error', 'Flip failed: ' + (e.message||e)); }
+			};
+
+			await startCamera(currentFacingMode);
 
 			const overlay = document.getElementById('overlay');
 			const context = overlay.getContext('2d');
@@ -601,6 +615,11 @@ export const buildPoseDetectorHtml = ({
 				const data = event && event.data || {};
 				if (data.type === 'reset') {
 					resetState();
+					return;
+				}
+
+				if (data.type === 'flipCamera') {
+					window.flipCamera && window.flipCamera();
 					return;
 				}
 

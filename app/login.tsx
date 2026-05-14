@@ -125,9 +125,10 @@ export default function LoginScreen() {
       : { native: 'bodify://redirect', scheme: 'bodify', path: 'redirect' }) as any);
 
   const googleClientIds = {
+    // webClientId is from Firebase project 351839980449 (bodify-37337)
     webClientId: '351839980449-tmdig61k3mom0b5rpnncsg149hvb0da9.apps.googleusercontent.com',
-    expoClientId: '395792534119-omb37fsn45c3o1ek79b7dcqjl0g87qda.apps.googleusercontent.com',
-    androidClientId: '395792534119-3bdas1ngpgr96q94lfiug98eg0u5ngau.apps.googleusercontent.com',
+    // androidClientId omitted: was from a different GCP project (395792534119) and caused
+    // DEVELOPER_ERROR. The browser-based PKCE fallback uses webClientId instead.
   };
 
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -233,24 +234,34 @@ export default function LoginScreen() {
       }
 
       if (Platform.OS === 'android') {
-        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-        const nativeResponse = await GoogleSignin.signIn();
-        const googleUser = nativeResponse?.data ?? nativeResponse;
-        const tokenResponse = await GoogleSignin.getTokens().catch(() => null);
-        const idToken = tokenResponse?.idToken || (googleUser as any)?.idToken || null;
-        const accessToken = tokenResponse?.accessToken || null;
+        try {
+          await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+          const nativeResponse = await GoogleSignin.signIn();
+          const googleUser = nativeResponse?.data ?? nativeResponse;
+          const tokenResponse = await GoogleSignin.getTokens().catch(() => null);
+          const idToken = tokenResponse?.idToken || (googleUser as any)?.idToken || null;
+          const accessToken = tokenResponse?.accessToken || null;
 
-        if (!idToken && !accessToken) {
-          throw new Error('Google sign-in did not return usable Google tokens. Verify the Firebase Android app registration and Google sign-in configuration.');
+          if (!idToken && !accessToken) {
+            throw new Error('Google sign-in did not return usable Google tokens. Verify the Firebase Android app registration and Google sign-in configuration.');
+          }
+
+          const credential = idToken
+            ? GoogleAuthProvider.credential(idToken)
+            : GoogleAuthProvider.credential(null, accessToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          await persistGoogleUser(userCredential?.user);
+          router.replace(await resolvePostLoginRoute(userCredential?.user) as any);
+          return;
+        } catch (nativeErr) {
+          // Native Google Sign-In failed (commonly DEVELOPER_ERROR when SHA-1 is not
+          // registered in Firebase). Fall through to the expo-auth-session PKCE flow.
+          const errCode = (nativeErr as any)?.code;
+          if (errCode !== 'SIGN_IN_CANCELLED' && errCode !== 'SIGN_IN_REQUIRED') {
+            console.warn('[Google] Native sign-in failed, falling back to browser flow:', nativeErr);
+          }
+          if (errCode === 'SIGN_IN_CANCELLED') return;
         }
-
-        const credential = idToken
-          ? GoogleAuthProvider.credential(idToken)
-          : GoogleAuthProvider.credential(null, accessToken);
-        const userCredential = await signInWithCredential(auth, credential);
-        await persistGoogleUser(userCredential?.user);
-        router.replace(await resolvePostLoginRoute(userCredential?.user) as any);
-        return;
       }
 
       setDidStartGoogle(true);

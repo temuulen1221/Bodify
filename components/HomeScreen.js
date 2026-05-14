@@ -890,7 +890,7 @@ const HomeScreen = () => {
     const menuPanelWidth = menuItemWidth;
     const menuPanelHeight = (menuActions.length * menuItemHeight) + ((menuActions.length - 1) * menuGap);
     const workoutCardTop = topBarMarginTop + effectiveTopBarHeight + 8;
-    const avatarWidth = clamp(frameWidth * 0.72, 246, 292);
+    const avatarWidth = clamp(frameWidth * 0.82, 260, 340);
     const avatarStageTop = menuTop + menuTabHeight + clamp(frameHeight * 0.012, 8, 12);
     const avatarStageBottom = clamp(frameHeight * 0.05, 34, 42);
     const bottomInsetPx = clamp(frameHeight * 0.0015, 0, 2);
@@ -1258,6 +1258,7 @@ const HomeScreen = () => {
               weight={weight}
               gender={gender}
               photoUri={photoUri}
+              sizeMultiplier={1.3}
               enableVoice={true}
               enableTTS={true}
               restingAnimation={activeIdleAnimation}

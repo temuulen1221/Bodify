@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ComponentType, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BackButton from '../components/BackButton';
 import InteractiveAvatar from '../components/InteractiveAvatar';
 import { BattleEvent, BattleParticipantInput, BattleResult, buildParticipantFromWorkout, generateBattleScript, mockBattleExample } from '../utils/battleScript';
@@ -60,7 +61,7 @@ const useParticipants = (params: BattleParams) => {
     );
     const seed = params.seed ? Number(params.seed) || undefined : undefined;
     return { userInput, opponentInput, seed };
-  }, [params]);
+  }, [params.userName, params.opponentName, params.userPushups, params.userPlankSec, params.oppPushups, params.oppPlankSec, params.seed]);
 };
 
 

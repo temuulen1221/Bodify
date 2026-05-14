@@ -1,7 +1,9 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Animated, PermissionsAndroid, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../components/BackButton';
@@ -187,6 +189,7 @@ export default function PoseScreen() {
   const [completedPlanIndexes, setCompletedPlanIndexes] = useState<number[]>([]);
   const [planProgressById, setPlanProgressById] = useState<Record<string, number>>({});
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const nativeWebViewRef = useRef<any>(null);
   const avatarRef = useRef<any>(null);
   const lastFeedbackAnnouncementRef = useRef('');
   const lastFeedbackAtRef = useRef(0);
@@ -399,6 +402,13 @@ export default function PoseScreen() {
     if (!privacyAccepted) {
       setDetectorStatus('idle');
       setDetectorError('');
+      return;
+    }
+    if (Platform.OS === 'android') {
+      PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      ]).catch(() => {});
     }
   }, [privacyAccepted]);
 
@@ -454,10 +464,20 @@ export default function PoseScreen() {
 
   const speakCoachLine = useCallback((message: string) => {
     const nextMessage = String(message || '').trim();
-    if (!nextMessage || Platform.OS !== 'web' || typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      return false;
+    if (!nextMessage) return false;
+
+    if (Platform.OS !== 'web') {
+      try {
+        const Speech = require('expo-speech');
+        Speech.stop();
+        Speech.speak(nextMessage, { rate: 1.0, pitch: 1.0 });
+        return true;
+      } catch (_) {
+        return false;
+      }
     }
 
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(nextMessage);
@@ -568,6 +588,14 @@ export default function PoseScreen() {
       try { iframeRef.current?.contentWindow?.postMessage({ type: 'reset' }, '*'); } catch (_) {}
     }
   }, [dispatch]);
+
+  const flipCamera = useCallback(() => {
+    if (Platform.OS === 'web') {
+      try { iframeRef.current?.contentWindow?.postMessage({ type: 'flipCamera' }, '*'); } catch (_) {}
+    } else {
+      nativeWebViewRef.current?.injectJavaScript('window.flipCamera && window.flipCamera(); true;');
+    }
+  }, []);
 
   const handleSelectCompactPlanItem = useCallback((index: number) => {
     const item = workoutPlanExercises[index];
@@ -1316,6 +1344,9 @@ export default function PoseScreen() {
           <Text style={styles.sectionEyebrow}>Tracking Stage</Text>
           <Text style={isCompactMobile ? styles.sectionTitleCompact : styles.sectionTitle}>Live camera + pose overlay</Text>
         </View>
+        <TouchableOpacity onPress={flipCamera} activeOpacity={0.8} style={styles.flipCameraButton}>
+          <MaterialCommunityIcons name="camera-flip-outline" size={20} color="#A0B4C8" />
+        </TouchableOpacity>
       </View>
       <View style={[styles.detectorStatsWidget, isCompactMobile && styles.detectorStatsWidgetCompact]}>
         <View style={styles.detectorStatItem}>
@@ -1336,13 +1367,17 @@ export default function PoseScreen() {
       <View style={[styles.viewer, isCompactMobile && styles.viewerCompact, Platform.OS === 'web' && styles.viewerWeb]}>
         {Platform.OS !== 'web' ? (
           <WebView
-            source={{ html: POSE_DETECTOR_HTML }}
+            ref={nativeWebViewRef}
+            source={{ html: POSE_DETECTOR_HTML, baseUrl: 'https://localhost' }}
             style={styles.webView}
             onMessage={onNativeMessage}
             javaScriptEnabled
             mediaPlaybackRequiresUserAction={false}
             allowsInlineMediaPlayback
             domStorageEnabled
+            originWhitelist={['*']}
+            mixedContentMode="always"
+            onPermissionRequest={(e) => e.nativeEvent.grant(e.nativeEvent.resources)}
           />
         ) : (
           <View style={[styles.phoneFrame, isCompactMobile && styles.phoneFrameCompact]}>
@@ -1603,13 +1638,17 @@ export default function PoseScreen() {
       <View style={styles.compactCameraBase}>
         {Platform.OS !== 'web' ? (
           <WebView
-            source={{ html: POSE_DETECTOR_HTML }}
+            ref={nativeWebViewRef}
+            source={{ html: POSE_DETECTOR_HTML, baseUrl: 'https://localhost' }}
             style={styles.compactImmersiveWebView}
             onMessage={onNativeMessage}
             javaScriptEnabled
             mediaPlaybackRequiresUserAction={false}
             allowsInlineMediaPlayback
             domStorageEnabled
+            originWhitelist={['*']}
+            mixedContentMode="always"
+            onPermissionRequest={(e) => e.nativeEvent.grant(e.nativeEvent.resources)}
           />
         ) : (
           <iframe ref={iframeRef} src={iframeSrc || undefined} srcDoc={iframeSrc ? undefined : POSE_DETECTOR_HTML} style={iframeStyle} allow="camera *; microphone *;" />
@@ -1620,6 +1659,10 @@ export default function PoseScreen() {
       <LinearGradient colors={['rgba(3,8,14,0)', 'rgba(3,8,14,0.18)', 'rgba(3,8,14,0.92)']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.compactBottomFade} />
 
       <View style={[styles.compactHudLayer, styles.compactHudLayerPointerEvents]}>
+        <TouchableOpacity onPress={flipCamera} activeOpacity={0.8} style={styles.compactFlipCameraButton}>
+          <MaterialCommunityIcons name="camera-flip-outline" size={26} color="#fff" />
+        </TouchableOpacity>
+
         <View style={styles.compactPersistentPlanWrap}>
           {renderCompactPersistentPlanTray()}
         </View>
@@ -1854,6 +1897,23 @@ const styles = StyleSheet.create({
   },
   compactHudLayerPointerEvents: {
     pointerEvents: 'box-none',
+  },
+  compactFlipCameraButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 28,
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactFlipCameraButtonText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '700',
   },
   compactStatusPill: {
     position: 'absolute',
@@ -2332,6 +2392,14 @@ const styles = StyleSheet.create({
   detectorShellCompact: { padding: 10 },
   detectorHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
   detectorHeaderCompact: { gap: 8, marginBottom: 8, flexDirection: 'column' },
+  flipCameraButton: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  flipCameraButtonText: { color: '#A0B4C8', fontSize: 13, fontWeight: '600' },
   detectorStatsWidget: {
     flexDirection: 'row',
     alignItems: 'stretch',

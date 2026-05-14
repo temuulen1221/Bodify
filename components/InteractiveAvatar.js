@@ -162,6 +162,7 @@ const InteractiveAvatar = forwardRef(({
   const animationQueueRef = useRef([]);
   const lipSyncRef = useRef(null);
   const vrmInstanceRef = useRef(null);
+  const avatarRef = useRef(null);
   const managersRef = useRef({
     lookAtManager: null,
     blinkManager: null,
@@ -652,6 +653,11 @@ const InteractiveAvatar = forwardRef(({
         mgr.setValue('oh', Math.max(0, Math.min(1, cur.oh)));
       } catch (_) {}
 
+      // Android: VRM lives in WebView, drive viseme via imperative ref
+      try {
+        avatarRef.current?.setViseme?.(cur.aa, cur.ee, cur.oh, true);
+      } catch (_) {}
+
       lipRafRef.current = requestAnimationFrame(tick);
     };
 
@@ -744,6 +750,54 @@ const InteractiveAvatar = forwardRef(({
 
       // Preferred path: remote TTS audio buffer + audio-reactive lipsync.
       const audioBuffer = await synthesizeSpeechAudio(speechText, { voiceType: selectedVoiceType });
+
+      // Native: play the fetched MP3 via expo-av with token-based lip pulse.
+      if (audioBuffer && Platform.OS !== 'web') {
+        try {
+          const bytes = new Uint8Array(audioBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          const base64 = btoa(binary);
+          const FileSystem = require('expo-file-system');
+          const tempUri = FileSystem.cacheDirectory + 'tts_response.mp3';
+          await FileSystem.writeAsStringAsync(tempUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+
+          if (!preserveAnimation) {
+            setCameraShot('closeup');
+            setEmotion('joy', 0.35, 0.16, false);
+            setConversationState(CONVERSATION_STATES.SPEAKING);
+          }
+          runConversationalGesture(speechText, { preserveAnimation });
+          onSpeechStart?.();
+          startLipLoop();
+          lipTargetRef.current = { aa: 0.1, ee: 0.04, oh: 0.05 };
+          const tokens = speechText.split(/\s+/).filter(Boolean);
+          tokens.forEach((token, index) => {
+            const tid = setTimeout(() => pulseViseme(token, 100 + Math.round(Math.random() * 70)), index * 130);
+            lipPulseTimersRef.current.push(tid);
+          });
+
+          const { Audio } = require('expo-av');
+          const { sound } = await Audio.Sound.createAsync({ uri: tempUri });
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.didJustFinish) {
+              sound.unloadAsync().catch(() => {});
+              clearLipPulseTimers();
+              lipTargetRef.current = { aa: 0, ee: 0, oh: 0 };
+              const tid = setTimeout(() => stopLipLoop(true), 140);
+              lipPulseTimersRef.current.push(tid);
+              preserveAnimationRef.current = false;
+              if (!preserveAnimation) setConversationState(CONVERSATION_STATES.IDLE);
+              onSpeechEnd?.();
+            }
+          });
+          await sound.playAsync();
+          return;
+        } catch (nativeAudioError) {
+          console.warn('[InteractiveAvatar] Native audio playback failed, falling back to expo-speech:', nativeAudioError);
+        }
+      }
+
       if (audioBuffer && lipSyncRef.current) {
         stopLipLoop(true);
         if (!preserveAnimation) {
@@ -843,7 +897,53 @@ const InteractiveAvatar = forwardRef(({
         setConversationState(CONVERSATION_STATES.IDLE);
       }
       onSpeechEnd?.();
-      // For Expo/native: implement using expo-speech or similar
+
+      // Native (Android / iOS) — expo-speech with token-based lip pulse
+      if (Platform.OS !== 'web') {
+        const Speech = require('expo-speech');
+        try {
+          Speech.stop();
+        } catch (_) {}
+        if (!preserveAnimation) {
+          setCameraShot('closeup');
+          setEmotion('joy', 0.35, 0.16, false);
+          setConversationState(CONVERSATION_STATES.SPEAKING);
+        }
+        runConversationalGesture(speechText, { preserveAnimation });
+        onSpeechStart?.();
+        startLipLoop();
+        lipTargetRef.current = { aa: 0.1, ee: 0.04, oh: 0.05 };
+
+        // Approximate word timing for lip pulses
+        const tokens = speechText.split(/\s+/).filter(Boolean);
+        tokens.forEach((token, index) => {
+          const timerId = setTimeout(() => {
+            pulseViseme(token, 100 + Math.round(Math.random() * 70));
+          }, index * 130);
+          lipPulseTimersRef.current.push(timerId);
+        });
+
+        Speech.speak(speechText, {
+          rate: clamp(TTS_RATE, 0.8, 1.2),
+          pitch: clamp(TTS_PITCH, 0.8, 1.2),
+          onDone: () => {
+            clearLipPulseTimers();
+            lipTargetRef.current = { aa: 0, ee: 0, oh: 0 };
+            const timerId = setTimeout(() => stopLipLoop(true), 140);
+            lipPulseTimersRef.current.push(timerId);
+            preserveAnimationRef.current = false;
+            if (!preserveAnimation) setConversationState(CONVERSATION_STATES.IDLE);
+            onSpeechEnd?.();
+          },
+          onError: () => {
+            stopLipLoop(true);
+            preserveAnimationRef.current = false;
+            if (!preserveAnimation) setConversationState(CONVERSATION_STATES.IDLE);
+            onSpeechEnd?.();
+          },
+        });
+        return;
+      }
     } catch (error) {
       preserveAnimationRef.current = false;
       if (!options.preserveAnimation) {
@@ -1152,6 +1252,7 @@ const InteractiveAvatar = forwardRef(({
   const avatarContent = (
     <Animated.View style={[styles.container, { opacity: isAnimating ? 0.9 : 1 }]}>
       <Avatar
+        ref={avatarRef}
         height={height}
         weight={weight}
         gender={gender}
