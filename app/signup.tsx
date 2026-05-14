@@ -18,7 +18,7 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const isValidEmail = (e) => /.+@.+\..+/.test(String(e || '').trim());
+  const isValidEmail = (e: string) => /.+@.+\..+/.test(String(e || '').trim());
 
   const handleSignUp = async () => {
     try {

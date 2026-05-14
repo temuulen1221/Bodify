@@ -1,18 +1,58 @@
-rules_version='2'
+rules_version='2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper: check if the requester is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: check if the requester owns the user document
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────
+    // Any signed-in user can read any profile (for leaderboard/social).
+    // Only the owner can write their own profile.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
+      // Quests sub-collection — owner only
+      match /quests/{questDoc} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // AI chat history — owner only
+      // Cloud Functions write here via Admin SDK (bypasses rules)
+      match /aiChats/{chatId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+
+      // Step metrics — owner only
+      match /metrics/{metricType}/{dateKey} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ── Friends ────────────────────────────────────────────────────────────
+    // Any signed-in user can read the friends list (leaderboard).
+    // A user can only create/update/delete their own friend entry.
+    match /friends/{friendId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // Deny everything else by default
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2025, 11, 4);
+      allow read, write: if false;
     }
   }
 }

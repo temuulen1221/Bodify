@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { User } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -18,7 +19,7 @@ const DEFAULT_LEVEL_CAP = 100;
 
 WebBrowser.maybeCompleteAuthSession();
 
-const persistGoogleUser = async (signedInUser) => {
+const persistGoogleUser = async (signedInUser: User) => {
   if (!signedInUser?.uid) return;
 
   const userRef = doc(db, 'users', signedInUser.uid);
@@ -71,7 +72,7 @@ const persistGoogleUser = async (signedInUser) => {
   await setDoc(userRef, baseProfile, { merge: true });
 };
 
-const resolvePostLoginRoute = async (signedInUser) => {
+const resolvePostLoginRoute = async (signedInUser: User | null): Promise<string> => {
   if (!signedInUser?.uid) return '/Avatar';
 
   const [localUser, snapshot] = await Promise.all([
@@ -83,7 +84,7 @@ const resolvePostLoginRoute = async (signedInUser) => {
   return hasAvatar ? '/(tabs)/Home' : '/Avatar';
 };
 
-const getWebAutofillValue = (placeholder) => {
+const getWebAutofillValue = (placeholder: string): string => {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return '';
 
   const matchingInput = Array.from(document.querySelectorAll('input')).find(
@@ -93,8 +94,8 @@ const getWebAutofillValue = (placeholder) => {
   return matchingInput?.value?.trim?.() || '';
 };
 
-const getFriendlyLoginError = (error) => {
-  const code = error?.code || '';
+const getFriendlyLoginError = (error: unknown): string => {
+  const code = (error as { code?: string })?.code || '';
 
   if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
     return 'Incorrect email or password. If this account was created with Google, use Sign in with Google.';

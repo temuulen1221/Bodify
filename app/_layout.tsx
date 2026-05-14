@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Provider, useDispatch } from 'react-redux';
 import BadgeLevelUpModal from '../components/BadgeLevelUpModal';
+import ErrorBoundary from '../components/ErrorBoundary';
 import LevelUpRewardModal from '../components/LevelUpRewardModal';
 import { ensureBackgroundStepTaskRegistered } from '../services/backgroundSteps';
 import { auth } from '../services/firebase';
@@ -225,6 +226,7 @@ export default function RootLayout() {
   };
 
   return (
+    <ErrorBoundary>
     <Provider store={store}>
       <WebMobileFrame>
         <StoreBootstrapper />
@@ -259,6 +261,7 @@ export default function RootLayout() {
         </Stack>
       </WebMobileFrame>
     </Provider>
+    </ErrorBoundary>
   );
 }
 

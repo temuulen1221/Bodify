@@ -45,7 +45,11 @@ const ALLOWED_ANIMATIONS = new Set([
 	"surprised",
 	"thinking",
 ]);
-const CALLABLE_CORS_ORIGINS = true;
+const CALLABLE_CORS_ORIGINS = [
+	"https://bodify-37337.web.app",
+	"https://bodify-37337.firebaseapp.com",
+	// Add your custom domain here if you have one
+];
 
 type ChatRole = "user" | "assistant" | "model";
 
@@ -328,8 +332,13 @@ async function executeChatWithAI(
 	return structured;
 }
 
-function applyLocalCors(response: { set: (name: string, value: string) => void; status: (code: number) => { send: (body?: unknown) => void; json: (body: unknown) => void } }): void {
-	response.set("Access-Control-Allow-Origin", "*");
+function applyLocalCors(response: { set: (name: string, value: string) => void; status: (code: number) => { send: (body?: unknown) => void; json: (body: unknown) => void } }, requestOrigin?: string): void {
+	const allowedOrigins = [
+		"https://bodify-37337.web.app",
+		"https://bodify-37337.firebaseapp.com",
+	];
+	const origin = (allowedOrigins.includes(requestOrigin ?? "")) ? requestOrigin! : allowedOrigins[0];
+	response.set("Access-Control-Allow-Origin", origin);
 	response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
 	response.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 	response.set("Access-Control-Max-Age", "3600");
@@ -344,9 +353,9 @@ export const chatWithAI = onCall({
 
 export const chatWithAIHttp = onRequest({
 	region: "us-central1",
-	cors: true,
+	cors: CALLABLE_CORS_ORIGINS,
 }, async (request, response) => {
-	applyLocalCors(response);
+	applyLocalCors(response, request.headers.origin);
 	if (request.method === "OPTIONS") {
 		response.status(204).send("");
 		return;
