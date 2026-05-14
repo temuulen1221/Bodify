@@ -63,6 +63,7 @@ export declare const setProfile: (payload: Partial<UserState>) => any;
 export declare const setAvatar: (payload: any) => any;
 export declare const hydrateQuests: (payload: Partial<QuestsState>) => any;
 export declare const hydrateWorkouts: (payload: Partial<WorkoutsState>) => any;
+export declare const hydrateSteps: (payload: Partial<StepsState>) => any;
 export declare const markQuestXPAwarded: (payload: { date: string; key: string }) => any;
 export declare const markSessionXPAwarded: (payload: { date: string; sessionId: string }) => any;
 export declare const addWorkoutSession: (payload: { date: string; session: Partial<WorkoutSession> & { reps?: string | number } }) => any;

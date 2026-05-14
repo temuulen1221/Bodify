@@ -92,7 +92,7 @@ export default function SignUpScreen() {
       // Proceed to avatar setup
       router.replace('/Avatar');
     } catch (err) {
-  setError(err?.message || 'Sign up failed. Please try again.');
+  setError((err as Error)?.message || 'Sign up failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -104,7 +104,7 @@ export default function SignUpScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <LinearGradient colors={GRADIENTS.futuristic} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.gradientBg}>
+        <LinearGradient colors={GRADIENTS.futuristic as [string, string, ...string[]]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.gradientBg}>
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }} keyboardShouldPersistTaps="handled">
             <View style={styles.card}>
             <Text style={styles.title}>Create Account</Text>
@@ -134,7 +134,7 @@ export default function SignUpScreen() {
               placeholderTextColor="rgba(255,255,255,0.65)"
             />
             <TouchableOpacity style={[styles.button, (loading ? { opacity: 0.7 } : null)]} onPress={handleSignUp} activeOpacity={0.9} disabled={loading}>
-              <LinearGradient colors={GRADIENTS.neonAccent} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.buttonInner}>
+              <LinearGradient colors={GRADIENTS.neonAccent as [string, string, ...string[]]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.buttonInner}>
                 <Text style={styles.buttonText}>{loading ? 'Creating…' : 'Sign Up'}</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -165,7 +165,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: 'bold',
     flexWrap: 'wrap',
-    numberOfLines: 2,
     maxWidth: 340,
     alignSelf: 'center',
   },

@@ -1,12 +1,11 @@
-import { GoogleSignin } from '@react-native-google-signin/google-signin/lib/module/signIn/GoogleSignin';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { User } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signInWithEmailAndPassword, signInWithPopup, User } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -105,7 +104,7 @@ const getFriendlyLoginError = (error: unknown): string => {
     return 'Too many login attempts. Wait a moment and try again.';
   }
 
-  return error?.message || 'Could not log in.';
+  return (error as Error)?.message || 'Could not log in.';
 };
 
 export default function LoginScreen() {
@@ -118,13 +117,12 @@ export default function LoginScreen() {
 
   // Use system browser except inside Expo Go
   const isExpoGo = Constants?.appOwnership === 'expo';
-  const redirectUri = makeRedirectUri(
-    isExpoGo
-      ? { useProxy: true, scheme: 'bodify' }
-      : Platform.OS === 'web'
-        ? { scheme: 'bodify' }
-        : { native: 'bodify://redirect', scheme: 'bodify', path: 'redirect' }
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const redirectUri = makeRedirectUri((isExpoGo
+    ? { useProxy: true, scheme: 'bodify' }
+    : Platform.OS === 'web'
+      ? { scheme: 'bodify' }
+      : { native: 'bodify://redirect', scheme: 'bodify', path: 'redirect' }) as any);
 
   const googleClientIds = {
     webClientId: '351839980449-tmdig61k3mom0b5rpnncsg149hvb0da9.apps.googleusercontent.com',
@@ -153,7 +151,8 @@ export default function LoginScreen() {
       if (!currentUser) return;
 
       try {
-        router.replace(await resolvePostLoginRoute(currentUser));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        router.replace(await resolvePostLoginRoute(currentUser) as any);
       } catch (error) {
         console.warn('[login] Failed to resolve post-login route', error);
         router.replace('/Avatar');
@@ -167,19 +166,22 @@ export default function LoginScreen() {
     const signInWithGoogle = async () => {
       try {
         if (response?.type === 'success') {
-          const idToken = response.authentication?.idToken || response.params?.id_token;
+          const successResponse = response as any;
+          const idToken = response.authentication?.idToken || successResponse.params?.id_token;
           if (!idToken) {
             throw new Error('Google sign-in did not return an ID token. Verify the Android OAuth client, redirect URI, and SHA-1 fingerprint in Google Cloud or Firebase.');
           }
           const credential = GoogleAuthProvider.credential(idToken);
           const userCredential = await signInWithCredential(auth, credential);
           await persistGoogleUser(userCredential?.user);
-          router.replace(await resolvePostLoginRoute(userCredential?.user));
+          router.replace(await resolvePostLoginRoute(userCredential?.user) as any);
         }
       } catch (err) {
         console.warn('Google sign-in failed:', err, '\nResponse:', JSON.stringify(response));
-        const message = (err && (err.message || String(err))) || 'Unknown error';
-        const errorParam = response?.params?.error || response?.error || '';
+        const errAny = err as any;
+        const message = (errAny?.message || String(err)) || 'Unknown error';
+        const responseAny = response as any;
+        const errorParam = responseAny?.params?.error || responseAny?.error || '';
         Alert.alert('Sign-in failed', `${errorParam ? errorParam + ': ' : ''}${message}`);
       } finally {
         setDidStartGoogle(false);
@@ -205,7 +207,7 @@ export default function LoginScreen() {
       setPassword(resolvedPassword);
 
       const userCredential = await signInWithEmailAndPassword(auth, resolvedEmail, resolvedPassword);
-      router.replace(await resolvePostLoginRoute(userCredential?.user));
+      router.replace(await resolvePostLoginRoute(userCredential?.user) as any);
     } catch (err) {
       const message = getFriendlyLoginError(err);
       setError(message);
@@ -226,7 +228,7 @@ export default function LoginScreen() {
         provider.addScope('email');
         const result = await signInWithPopup(auth, provider);
         await persistGoogleUser(result?.user);
-        router.replace(await resolvePostLoginRoute(result?.user));
+        router.replace(await resolvePostLoginRoute(result?.user) as any);
         return;
       }
 
@@ -235,7 +237,7 @@ export default function LoginScreen() {
         const nativeResponse = await GoogleSignin.signIn();
         const googleUser = nativeResponse?.data ?? nativeResponse;
         const tokenResponse = await GoogleSignin.getTokens().catch(() => null);
-        const idToken = tokenResponse?.idToken || googleUser?.idToken || null;
+        const idToken = tokenResponse?.idToken || (googleUser as any)?.idToken || null;
         const accessToken = tokenResponse?.accessToken || null;
 
         if (!idToken && !accessToken) {
@@ -247,22 +249,22 @@ export default function LoginScreen() {
           : GoogleAuthProvider.credential(null, accessToken);
         const userCredential = await signInWithCredential(auth, credential);
         await persistGoogleUser(userCredential?.user);
-        router.replace(await resolvePostLoginRoute(userCredential?.user));
+        router.replace(await resolvePostLoginRoute(userCredential?.user) as any);
         return;
       }
 
       setDidStartGoogle(true);
-      await promptAsync({ windowName: 'oauth', prefersEphemeralSession: false, showInRecents: true });
+      await promptAsync({ windowName: 'oauth', preferEphemeralSession: false, showInRecents: true });
     } catch (err) {
       setDidStartGoogle(false);
-      Alert.alert('Sign-in failed', err?.message || 'Google sign-in failed.');
+      Alert.alert('Sign-in failed', (err as Error)?.message || 'Google sign-in failed.');
     }
   };
 
   return (
     <ScreenFrame>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <LinearGradient colors={GRADIENTS.futuristic} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientBg}>
+        <LinearGradient colors={GRADIENTS.futuristic as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientBg}>
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }} keyboardShouldPersistTaps="handled">
             <View style={styles.card}>
             <Image
@@ -298,7 +300,7 @@ export default function LoginScreen() {
               placeholderTextColor="rgba(255,255,255,0.65)"
             />
             <TouchableOpacity style={[styles.button, loading ? styles.buttonDisabled : null]} onPress={handleLogin} activeOpacity={0.9} disabled={loading}>
-              <LinearGradient colors={GRADIENTS.neonAccent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.buttonInner}>
+              <LinearGradient colors={GRADIENTS.neonAccent as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.buttonInner}>
                 <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Login'}</Text>
               </LinearGradient>
             </TouchableOpacity>

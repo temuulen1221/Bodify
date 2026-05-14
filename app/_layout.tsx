@@ -190,7 +190,7 @@ export default function RootLayout() {
             loadRemoteUserState(),
           ]);
           if (didCancel) return;
-          const mergedUser = mergeHydratedUserState(localData, remoteData);
+          const mergedUser = mergeHydratedUserState(localData as any, remoteData as any);
           if (Object.keys(mergedUser).length > 0) {
             dispatch(hydrateUser(mergedUser));
           }
@@ -204,7 +204,7 @@ export default function RootLayout() {
           loadUserState(),
           loadRemoteUserState(),
         ]);
-        const mergedUser = mergeHydratedUserState(data, remoteData);
+        const mergedUser = mergeHydratedUserState(data as any, remoteData as any);
         if (Object.keys(mergedUser).length > 0) dispatch(hydrateUser(mergedUser));
         const awards = await loadAwardsState();
         if (awards?.quests) dispatch(hydrateQuests(awards.quests));
