@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../components/BackButton';
-import { setPoints } from '../store';
+import { addOwnedShopItem, consumeDiscountTicket, spendEnergy } from '../store';
 
 const ITEMS = [
   // Avatar > Clothes
@@ -30,18 +30,41 @@ const SUB_CATEGORIES = {
 };
 
 export default function Shop() {
-  const points = useSelector((s) => s.user?.points ?? 0);
+  const energy = useSelector((s) => s.user?.energy ?? 0);
+  const discountTickets = useSelector((s) => s.user?.discountTickets ?? 0);
+  const streakShields = useSelector((s) => s.user?.streakShields ?? 0);
+  const ownedShopItems = useSelector((s) => s.user?.ownedShopItems ?? []);
   const dispatch = useDispatch();
   const [mainCat, setMainCat] = useState('Avatar');
   const [subCat, setSubCat] = useState(SUB_CATEGORIES['Avatar'][0]);
+  const [ticketItemId, setTicketItemId] = useState(null);
+
+  const isOwned = (itemId) => Array.isArray(ownedShopItems) && ownedShopItems.includes(itemId);
+  const getItemPrice = (item) => {
+    const basePrice = Math.max(0, Number(item?.price) || 0);
+    if (ticketItemId === item?.id && discountTickets > 0) {
+      return Math.max(1, Math.floor(basePrice * 0.75));
+    }
+    return basePrice;
+  };
 
   const handleBuy = (item) => {
-    if (points < item.price) {
-      Alert.alert('Not enough points', `You need ${item.price} points to buy ${item.name}.`);
+    if (isOwned(item.id)) {
+      Alert.alert('Already owned', `${item.name} is already unlocked.`);
       return;
     }
-    dispatch(setPoints(points - item.price));
-    Alert.alert('Purchase successful', `You bought ${item.name} for ${item.price} points!`);
+    const price = getItemPrice(item);
+    if (energy < price) {
+      Alert.alert('Not enough energy', `You need ${price} energy to buy ${item.name}.`);
+      return;
+    }
+    if (ticketItemId === item.id && discountTickets > 0) {
+      dispatch(consumeDiscountTicket());
+      setTicketItemId(null);
+    }
+    dispatch(spendEnergy(price));
+    dispatch(addOwnedShopItem(item.id));
+    Alert.alert('Purchase successful', `You bought ${item.name} for ${price} energy!`);
   };
 
   // Filter items by selected category/subcategory
@@ -56,8 +79,14 @@ export default function Shop() {
       </View>
       <Text style={styles.title}>Shop</Text>
       <View style={styles.pointsRow}>
-        <Text style={styles.pointsLabel}>Your Points:</Text>
-        <Text style={styles.pointsValue}>{points}</Text>
+        <Text style={styles.pointsLabel}>Your Energy:</Text>
+        <Text style={styles.pointsValue}>{energy}</Text>
+      </View>
+      <Text style={styles.energyHint}>Earn energy when you level up, then spend it here.</Text>
+      <View style={styles.inventoryRow}>
+        <View style={styles.inventoryChip}><Text style={styles.inventoryChipText}>{`${discountTickets} ticket${discountTickets === 1 ? '' : 's'}`}</Text></View>
+        <View style={styles.inventoryChip}><Text style={styles.inventoryChipText}>{`${streakShields} shield${streakShields === 1 ? '' : 's'}`}</Text></View>
+        <View style={styles.inventoryChip}><Text style={styles.inventoryChipText}>{`${Array.isArray(ownedShopItems) ? ownedShopItems.length : 0} owned`}</Text></View>
       </View>
       {/* Main category neon tab bar */}
       <View style={styles.tabBar}>
@@ -99,13 +128,22 @@ export default function Shop() {
                 <Image source={item.icon} style={styles.itemIcon} />
               </View>
               <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemPrice}>{item.price} pts</Text>
+              <Text style={styles.itemPrice}>{`${getItemPrice(item)} energy${ticketItemId === item.id && discountTickets > 0 ? ' with ticket' : ''}`}</Text>
+              {isOwned(item.id) ? <Text style={styles.ownedText}>Milestone unlocked</Text> : null}
+              {!isOwned(item.id) && discountTickets > 0 ? (
+                <TouchableOpacity
+                  style={[styles.ticketBtn, ticketItemId === item.id && styles.ticketBtnActive]}
+                  onPress={() => setTicketItemId((current) => current === item.id ? null : item.id)}
+                >
+                  <Text style={[styles.ticketBtnText, ticketItemId === item.id && styles.ticketBtnTextActive]}>{ticketItemId === item.id ? 'Ticket applied' : 'Use ticket -25%'}</Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity
-                style={[styles.buyBtn, points < item.price && styles.buyBtnDisabled]}
+                style={[styles.buyBtn, (energy < getItemPrice(item) || isOwned(item.id)) && styles.buyBtnDisabled]}
                 onPress={() => handleBuy(item)}
-                disabled={points < item.price}
+                disabled={energy < getItemPrice(item) || isOwned(item.id)}
               >
-                <Text style={styles.buyBtnText}>{points < item.price ? 'Not enough' : 'Buy'}</Text>
+                <Text style={styles.buyBtnText}>{isOwned(item.id) ? 'Owned' : energy < getItemPrice(item) ? 'Not enough' : 'Buy'}</Text>
               </TouchableOpacity>
             </View>
           </LinearGradient>
@@ -150,6 +188,33 @@ const styles = StyleSheet.create({
       boxShadow: '0px 1px 8px #00eaff',
       justifyContent: 'center',
       marginBottom: 8,
+    },
+    energyHint: {
+      color: '#CFF7FF',
+      textAlign: 'center',
+      marginBottom: 14,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    inventoryRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 14,
+    },
+    inventoryChip: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: 'rgba(255,255,255,0.07)',
+      borderWidth: 1,
+      borderColor: 'rgba(0,231,255,0.22)',
+    },
+    inventoryChipText: {
+      color: '#DDF9FF',
+      fontSize: 12,
+      fontWeight: '700',
     },
     tabBar: {
       flexDirection: 'row',
@@ -264,6 +329,33 @@ const styles = StyleSheet.create({
       marginBottom: 10,
       fontWeight: '600',
       boxShadow: '0px 1px 6px #00eaff',
+    },
+    ownedText: {
+      color: '#86EFAC',
+      fontSize: 12,
+      fontWeight: '800',
+      marginBottom: 8,
+    },
+    ticketBtn: {
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      marginBottom: 8,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(0,231,255,0.18)',
+    },
+    ticketBtnActive: {
+      backgroundColor: 'rgba(0,231,255,0.22)',
+      borderColor: '#00eaff',
+    },
+    ticketBtnText: {
+      color: '#CFF7FF',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    ticketBtnTextActive: {
+      color: '#fff',
     },
     buyBtn: {
       backgroundColor: '#7f00ff',

@@ -164,7 +164,7 @@ export default function Leaderboard() {
         contentContainerStyle={styles.listContent}
       />
       {showAdd && (
-        <View style={styles.modalOverlay} pointerEvents="box-none">
+        <View style={[styles.modalOverlay, { pointerEvents: 'box-none' }]}>
           <Pressable style={styles.backdrop} onPress={closeAddModal} />
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Add a friend</Text>

@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "version": 1,
+    "description": "Local exercise pose profiles consumed by poseExerciseConfig at build time. Add per-exercise threshold overrides or sample arrays to tune rep detection."
+  },
+  "squat": {
+    "samples": {
+      "down": [84, 88, 92, 96, 101],
+      "up": [156, 160, 165, 170, 172]
+    },
+    "quality": {
+      "minVisibility": 0.55,
+      "requiredLandmarks": [
+        "leftShoulder",
+        "rightShoulder",
+        "leftHip",
+        "rightHip",
+        "leftKnee",
+        "rightKnee",
+        "leftAnkle",
+        "rightAnkle"
+      ],
+      "invalidFrameHint": "Keep your full body in frame"
+    }
+  },
+  "pushup": {
+    "samples": {
+      "down": [58, 64, 70, 76, 82],
+      "up": [148, 152, 156, 160, 164]
+    },
+    "quality": {
+      "minVisibility": 0.5,
+      "requiredLandmarks": [
+        "leftShoulder",
+        "rightShoulder",
+        "leftElbow",
+        "rightElbow",
+        "leftWrist",
+        "rightWrist",
+        "leftHip",
+        "rightHip",
+        "leftAnkle",
+        "rightAnkle"
+      ],
+      "invalidFrameHint": "Show shoulders, elbows, hips, and ankles"
+    }
+  },
+  "plank": {
+    "thresholds": {
+      "min": 152
+    },
+    "quality": {
+      "minVisibility": 0.5,
+      "requiredLandmarks": [
+        "leftShoulder",
+        "rightShoulder",
+        "leftHip",
+        "rightHip",
+        "leftAnkle",
+        "rightAnkle"
+      ],
+      "invalidFrameHint": "Keep your shoulders, hips, and ankles visible"
+    }
+  }
+}

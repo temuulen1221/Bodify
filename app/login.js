@@ -1,49 +1,179 @@
+import { GoogleSignin } from '@react-native-google-signin/google-signin/lib/module/signIn/GoogleSignin';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { auth } from '../services/firebase';
+import ScreenFrame from '../components/ScreenFrame';
+import { auth, db } from '../services/firebase';
+import { hasCompletedAvatarSetup, loadUserState } from '../services/storage';
 import { COLORS, GRADIENTS } from '../utils/constants';
 
+const DEFAULT_LEVEL_CAP = 100;
+
 WebBrowser.maybeCompleteAuthSession();
+
+const persistGoogleUser = async (signedInUser) => {
+  if (!signedInUser?.uid) return;
+
+  const userRef = doc(db, 'users', signedInUser.uid);
+  const snapshot = await getDoc(userRef);
+  const baseProfile = {
+    email: signedInUser.email || '',
+    displayName: signedInUser.displayName || '',
+    photoURL: signedInUser.photoURL || '',
+    provider: 'google',
+    lastLoginAt: serverTimestamp(),
+  };
+
+  if (!snapshot.exists()) {
+    await setDoc(userRef, {
+      ...baseProfile,
+      createdAt: serverTimestamp(),
+      points: 0,
+      pointsMax: DEFAULT_LEVEL_CAP,
+      totalXP: 0,
+      energy: 0,
+      discountTickets: 0,
+      streakShields: 0,
+      ownedShopItems: [],
+      streakCount: 0,
+      bestStreak: 0,
+      lastWorkoutDate: null,
+      recentRewards: [],
+      lastRewardAt: null,
+      lastLevelUpAt: null,
+      lastLevelUpReward: null,
+      lastLevelUpModalSeenAt: null,
+      achievements: [],
+      progress: 0,
+      avatarName: signedInUser.displayName || '',
+      height: '',
+      weight: '',
+      bodyShape: '',
+      photoUri: signedInUser.photoURL || '',
+      gender: '',
+      level: 1,
+      dailyStepGoal: 10000,
+      weeklyWorkoutGoal: 5,
+      targetWeight: '',
+      dailyQuests: [],
+      avatarSetupComplete: false,
+    }, { merge: true });
+    return;
+  }
+
+  await setDoc(userRef, baseProfile, { merge: true });
+};
+
+const resolvePostLoginRoute = async (signedInUser) => {
+  if (!signedInUser?.uid) return '/Avatar';
+
+  const [localUser, snapshot] = await Promise.all([
+    loadUserState().catch(() => null),
+    getDoc(doc(db, 'users', signedInUser.uid)).catch(() => null),
+  ]);
+  const remoteUser = snapshot?.exists?.() ? snapshot.data() : {};
+  const hasAvatar = hasCompletedAvatarSetup(remoteUser) || hasCompletedAvatarSetup(localUser);
+  return hasAvatar ? '/(tabs)/Home' : '/Avatar';
+};
+
+const getWebAutofillValue = (placeholder) => {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return '';
+
+  const matchingInput = Array.from(document.querySelectorAll('input')).find(
+    (input) => input.getAttribute('placeholder') === placeholder
+  );
+
+  return matchingInput?.value?.trim?.() || '';
+};
+
+const getFriendlyLoginError = (error) => {
+  const code = error?.code || '';
+
+  if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+    return 'Incorrect email or password. If this account was created with Google, use Sign in with Google.';
+  }
+
+  if (code === 'auth/too-many-requests') {
+    return 'Too many login attempts. Wait a moment and try again.';
+  }
+
+  return error?.message || 'Could not log in.';
+};
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [didStartGoogle, setDidStartGoogle] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Use system browser except inside Expo Go
   const isExpoGo = Constants?.appOwnership === 'expo';
-  const useProxy = Platform.OS === 'web' ? false : isExpoGo;
-  const redirectUri = makeRedirectUri({ useProxy, scheme: 'bodify' });
+  const redirectUri = makeRedirectUri(
+    isExpoGo
+      ? { useProxy: true, scheme: 'bodify' }
+      : Platform.OS === 'web'
+        ? { scheme: 'bodify' }
+        : { native: 'bodify://redirect', scheme: 'bodify', path: 'redirect' }
+  );
 
   const googleClientIds = {
-    webClientId: '395792534119-gv8ldff77a88kiuauikhjepr44e3n1e0.apps.googleusercontent.com',
+    webClientId: '351839980449-tmdig61k3mom0b5rpnncsg149hvb0da9.apps.googleusercontent.com',
     expoClientId: '395792534119-omb37fsn45c3o1ek79b7dcqjl0g87qda.apps.googleusercontent.com',
-    androidClientId: '395792534119-umrkv075vdca1vn9rmqk1prp2341n1tk.apps.googleusercontent.com',
+    androidClientId: '395792534119-3bdas1ngpgr96q94lfiug98eg0u5ngau.apps.googleusercontent.com',
   };
 
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+  const [request, response, promptAsync] = Google.useAuthRequest({
     ...googleClientIds,
     scopes: ['openid', 'profile', 'email'],
     redirectUri,
+    shouldAutoExchangeCode: Platform.OS !== 'web',
+    selectAccount: true,
   });
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    GoogleSignin.configure({
+      webClientId: googleClientIds.webClientId,
+    });
+  }, [googleClientIds.webClientId]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser) return;
+
+      try {
+        router.replace(await resolvePostLoginRoute(currentUser));
+      } catch (error) {
+        console.warn('[login] Failed to resolve post-login route', error);
+        router.replace('/Avatar');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     const signInWithGoogle = async () => {
       try {
         if (response?.type === 'success') {
-          const idToken = response.params?.id_token;
-          if (!idToken) return;
+          const idToken = response.authentication?.idToken || response.params?.id_token;
+          if (!idToken) {
+            throw new Error('Google sign-in did not return an ID token. Verify the Android OAuth client, redirect URI, and SHA-1 fingerprint in Google Cloud or Firebase.');
+          }
           const credential = GoogleAuthProvider.credential(idToken);
-          await signInWithCredential(auth, credential);
-          router.replace('/(tabs)/Home');
+          const userCredential = await signInWithCredential(auth, credential);
+          await persistGoogleUser(userCredential?.user);
+          router.replace(await resolvePostLoginRoute(userCredential?.user));
         }
       } catch (err) {
         console.warn('Google sign-in failed:', err, '\nResponse:', JSON.stringify(response));
@@ -54,58 +184,128 @@ export default function LoginScreen() {
         setDidStartGoogle(false);
       }
     };
-    if (didStartGoogle) signInWithGoogle();
+    if (didStartGoogle && Platform.OS !== 'web') signInWithGoogle();
   }, [response, didStartGoogle, router]);
 
   const handleLogin = async () => {
-    if (email && password) {
-      try {
-        // Use Firebase Auth to sign in and persist session
-          await signInWithEmailAndPassword(auth, email, password);
-        router.replace('/(tabs)/Home');
-      } catch (err) {
-        Alert.alert('Login failed', err?.message || 'Could not log in.');
+    const resolvedEmail = (email || getWebAutofillValue('Email')).trim();
+    const resolvedPassword = password || getWebAutofillValue('Password');
+
+    setError('');
+
+    if (!resolvedEmail || !resolvedPassword) {
+      setError('Enter your email and password to log in. If your browser autofilled them, click into the fields once and try again.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setEmail(resolvedEmail);
+      setPassword(resolvedPassword);
+
+      const userCredential = await signInWithEmailAndPassword(auth, resolvedEmail, resolvedPassword);
+      router.replace(await resolvePostLoginRoute(userCredential?.user));
+    } catch (err) {
+      const message = getFriendlyLoginError(err);
+      setError(message);
+      if (Platform.OS !== 'web') {
+        Alert.alert('Login failed', message);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const provider = new GoogleAuthProvider();
+        provider.addScope('openid');
+        provider.addScope('profile');
+        provider.addScope('email');
+        const result = await signInWithPopup(auth, provider);
+        await persistGoogleUser(result?.user);
+        router.replace(await resolvePostLoginRoute(result?.user));
+        return;
+      }
+
+      if (Platform.OS === 'android') {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        const nativeResponse = await GoogleSignin.signIn();
+        const googleUser = nativeResponse?.data ?? nativeResponse;
+        const tokenResponse = await GoogleSignin.getTokens().catch(() => null);
+        const idToken = tokenResponse?.idToken || googleUser?.idToken || null;
+        const accessToken = tokenResponse?.accessToken || null;
+
+        if (!idToken && !accessToken) {
+          throw new Error('Google sign-in did not return usable Google tokens. Verify the Firebase Android app registration and Google sign-in configuration.');
+        }
+
+        const credential = idToken
+          ? GoogleAuthProvider.credential(idToken)
+          : GoogleAuthProvider.credential(null, accessToken);
+        const userCredential = await signInWithCredential(auth, credential);
+        await persistGoogleUser(userCredential?.user);
+        router.replace(await resolvePostLoginRoute(userCredential?.user));
+        return;
+      }
+
+      setDidStartGoogle(true);
+      await promptAsync({ windowName: 'oauth', prefersEphemeralSession: false, showInRecents: true });
+    } catch (err) {
+      setDidStartGoogle(false);
+      Alert.alert('Sign-in failed', err?.message || 'Google sign-in failed.');
     }
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <LinearGradient colors={GRADIENTS.futuristic} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientBg}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }} keyboardShouldPersistTaps="handled">
-          <View style={styles.card}>
-            <Image source={require('../assets/images/icon.png')} style={styles.logo} />
+    <ScreenFrame>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <LinearGradient colors={GRADIENTS.futuristic} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradientBg}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }} keyboardShouldPersistTaps="handled">
+            <View style={styles.card}>
+            <Image
+              source={require('../assets/icons/icon/icon/android/mipmap-xxxhdpi/ic_launcher_foreground.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>Log in to your Bodify account</Text>
             <TextInput
               style={styles.input}
               placeholder="Email"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                if (error) setError('');
+              }}
               autoCapitalize="none"
               keyboardType="email-address"
+              autoComplete="email"
               placeholderTextColor="rgba(255,255,255,0.65)"
             />
             <TextInput
               style={styles.input}
               placeholder="Password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                if (error) setError('');
+              }}
               secureTextEntry
+              autoComplete="current-password"
               placeholderTextColor="rgba(255,255,255,0.65)"
             />
-            <TouchableOpacity style={styles.button} onPress={handleLogin} activeOpacity={0.9}>
+            <TouchableOpacity style={[styles.button, loading ? styles.buttonDisabled : null]} onPress={handleLogin} activeOpacity={0.9} disabled={loading}>
               <LinearGradient colors={GRADIENTS.neonAccent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.buttonInner}>
-                <Text style={styles.buttonText}>Login</Text>
+                <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Login'}</Text>
               </LinearGradient>
             </TouchableOpacity>
+            {!!error && <Text style={styles.errorText}>{error}</Text>}
             <TouchableOpacity
               style={styles.googleButton}
-              onPress={() => {
-                setDidStartGoogle(true);
-                promptAsync({ useProxy, redirectUri, windowName: 'oauth', prefersEphemeralSession: false, showInRecents: true });
-              }}
-              disabled={!request}
+              onPress={handleGoogleLogin}
+              disabled={Platform.OS !== 'web' ? !request : false}
               activeOpacity={0.7}
             >
               <View style={styles.googleButtonContent}>
@@ -116,13 +316,14 @@ export default function LoginScreen() {
             <TouchableOpacity onPress={() => router.push('/signup')} style={styles.switchLink}>
               <Text style={styles.switchText}>Don&apos;t have an account? Sign Up </Text>
             </TouchableOpacity>
-          </View>
-        </ScrollView>
-        <TouchableOpacity style={styles.avatarButton} onPress={() => router.push('/Avatar')}>
-          <Text style={styles.avatarButtonText}>Avatar</Text>
-        </TouchableOpacity>
-      </LinearGradient>
-    </KeyboardAvoidingView>
+            </View>
+          </ScrollView>
+          <TouchableOpacity style={styles.avatarButton} onPress={() => router.push('/Avatar')}>
+            <Text style={styles.avatarButtonText}>Avatar</Text>
+          </TouchableOpacity>
+        </LinearGradient>
+      </KeyboardAvoidingView>
+    </ScreenFrame>
   );
 }
 
@@ -173,7 +374,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 14,
   },
+  errorText: {
+    color: '#FFD7E0',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 14,
+    width: '100%',
+  },
   button: { paddingVertical: 0, paddingHorizontal: 0, borderRadius: 24, marginBottom: 18, alignSelf: 'stretch' },
+  buttonDisabled: {
+    opacity: 0.75,
+  },
   buttonInner: {
     paddingVertical: 14,
     borderRadius: 24,

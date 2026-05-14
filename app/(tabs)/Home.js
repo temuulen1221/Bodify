@@ -1,1 +1,2 @@
-export { default } from '../../app/Home';
+export { default } from '../../components/HomeScreen';
+

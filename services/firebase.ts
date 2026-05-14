@@ -1,6 +1,9 @@
 import { initializeApp } from 'firebase/app';
-import { Auth, getAuth, initializeAuth, onAuthStateChanged } from 'firebase/auth';
-import { enableIndexedDbPersistence, Firestore, initializeFirestore } from 'firebase/firestore';
+import { Auth, browserLocalPersistence, getAuth, initializeAuth, onAuthStateChanged, setPersistence } from 'firebase/auth';
+import { Firestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { connectFunctionsEmulator, Functions, getFunctions } from 'firebase/functions';
+import { FirebaseStorage, getStorage } from 'firebase/storage';
+import { Platform } from 'react-native';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzePvt6wOKjSkqeU6LdbJusok097PRPqE",
@@ -13,10 +16,45 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const functionsRegion = process.env.EXPO_PUBLIC_FUNCTIONS_REGION || 'us-central1';
+const defaultFunctionsEmulatorPort = Number(process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT || 5001);
+const isWeb = Platform.OS === 'web';
+
+const resolveFunctionsEmulatorConfig = () => {
+  const configuredHost = String(process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST || '').trim();
+  const configuredPort = Number(process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT || 0);
+  if (configuredHost && Number.isFinite(configuredPort) && configuredPort > 0) {
+    return { host: configuredHost, port: configuredPort };
+  }
+
+  if (!__DEV__ || !isWeb || typeof window === 'undefined') {
+    return null;
+  }
+
+  const hostname = String(window.location?.hostname || '').trim();
+  const isLocalWebHost = hostname === 'localhost' || hostname === '127.0.0.1' || /^192\.168\.\d+\.\d+$/.test(hostname);
+  if (!isLocalWebHost || !Number.isFinite(defaultFunctionsEmulatorPort) || defaultFunctionsEmulatorPort <= 0) {
+    return null;
+  }
+
+  return { host: hostname, port: defaultFunctionsEmulatorPort };
+};
+
+const getFunctionsEmulatorHttpBaseUrl = () => {
+  const emulatorConfig = resolveFunctionsEmulatorConfig();
+  if (!emulatorConfig) return '';
+  return `http://${emulatorConfig.host}:${emulatorConfig.port}/${firebaseConfig.projectId}/${functionsRegion}`;
+};
 
 let auth: Auth;
 let currentUserId: string | null = null;
 try {
+  if (isWeb) {
+    auth = getAuth(app);
+    setPersistence(auth, browserLocalPersistence).catch((error) => {
+      console.warn('[firebase] Failed to enable browser auth persistence', error);
+    });
+  } else {
   // Attempt to use React Native persistence when available; load helper dynamically to avoid type issues
   // @ts-ignore
   const AsyncStorage = require('@react-native-async-storage/async-storage').default;
@@ -35,16 +73,26 @@ try {
   } else {
     auth = getAuth(app);
   }
+  }
 } catch (e) {
   auth = getAuth(app);
 }
 
 // Initialize Firestore with long polling to better handle networking constraints in RN/Expo environments
 let db: Firestore;
+let storage: FirebaseStorage;
+let functions: Functions;
 try {
   db = initializeFirestore(app, {
     experimentalForceLongPolling: true,
     experimentalAutoDetectLongPolling: true,
+    ...(isWeb && typeof window !== 'undefined'
+      ? {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager(),
+          }),
+        }
+      : {}),
   });
 } catch (e) {
   // Fallback to default initialization if enhanced config fails
@@ -53,11 +101,13 @@ try {
   db = fallback(app);
 }
 
-// Attempt to enable IndexedDB persistence (web only) for offline caching; ignore failures (multi-tab, unsupported)
+storage = getStorage(app);
+
+functions = getFunctions(app, functionsRegion);
 try {
-  // This will throw on native platforms; guarded by feature detect
-  if (typeof window !== 'undefined') {
-    enableIndexedDbPersistence(db).catch(() => {});
+  const emulatorConfig = resolveFunctionsEmulatorConfig();
+  if (emulatorConfig) {
+    connectFunctionsEmulator(functions, emulatorConfig.host, emulatorConfig.port);
   }
 } catch (_) {}
 
@@ -68,5 +118,5 @@ onAuthStateChanged(auth, (user) => {
   currentUserId = user?.uid ?? null;
 });
 
-export { app, auth, currentUserId, db };
+export { app, auth, currentUserId, db, functions, getFunctionsEmulatorHttpBaseUrl, storage };
 

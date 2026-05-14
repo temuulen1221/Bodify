@@ -7,7 +7,7 @@
 module.exports = {
   project: {
     android: {
-      packageName: 'com.yourname.bodify',
+      packageName: 'com.temuulen1221.bodify',
     },
   },
 };

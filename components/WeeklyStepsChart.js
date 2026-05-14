@@ -4,6 +4,8 @@ import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react
 import { useSelector } from 'react-redux';
 import { GRADIENTS } from '../utils/constants';
 
+const HOME_FRAME_WIDTH = 414;
+
 function formatKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -33,6 +35,7 @@ function formatRangeLabel(start, end) {
 export default function WeeklyStepsChart({ weeksBack = 8, weekStartsOn = 1, onPressMonthly }) {
   const stepsByDate = useSelector((s) => s.steps?.stepsByDate || {});
   const { width: SCREEN_W } = Dimensions.get('window');
+  const frameWidth = Math.min(SCREEN_W, HOME_FRAME_WIDTH);
   const pagerRef = useRef(null);
   const currentIndexRef = useRef(0);
   const setCurrentIndex = (v) => { currentIndexRef.current = v; };
@@ -63,7 +66,7 @@ export default function WeeklyStepsChart({ weeksBack = 8, weekStartsOn = 1, onPr
 
   // Auto-snap to the most recent week (last page) when multiple weeks are shown
   useEffect(() => {
-    const pageWidth = SCREEN_W - 2 * 16; // Match container padding from Analysis screen
+    const pageWidth = frameWidth - 2 * 16; // Match container padding from Analysis screen
     if (!pagerRef.current || !data || data.length <= 1 || pageWidth <= 0) return;
     const x = pageWidth * (data.length - 1);
     const t = setTimeout(() => {
@@ -71,9 +74,9 @@ export default function WeeklyStepsChart({ weeksBack = 8, weekStartsOn = 1, onPr
       setCurrentIndex(data.length - 1);
     }, 0);
     return () => clearTimeout(t);
-  }, [data, SCREEN_W]);
+  }, [data, frameWidth]);
 
-  const pageWidth = SCREEN_W - 2 * 16;
+  const pageWidth = frameWidth - 2 * 16;
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   // gotoIndex removed (unused)
 
@@ -100,7 +103,7 @@ export default function WeeklyStepsChart({ weeksBack = 8, weekStartsOn = 1, onPr
         contentContainerStyle={{}}
       >
         {data.map((wk, idx) => (
-          <View key={`${wk.title}-${idx}`} style={[styles.weekPage, { width: SCREEN_W - 2 * 16 /* approx card horizontal padding in Analysis */ }]}>
+          <View key={`${wk.title}-${idx}`} style={[styles.weekPage, { width: frameWidth - 2 * 16 /* approx card horizontal padding in Analysis */ }]}>
             <Text style={styles.weekTitle}>{wk.title}</Text>
             <View style={styles.chartArea}>
               {wk.rows.map((r) => {

@@ -6,6 +6,18 @@ import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../components/BackButton';
 import { addWorkoutSession } from '../store';
 
+const HOME_FRAME_WIDTH = 414;
+
+const getSessionTypeIconName = (type) => {
+  const normalizedType = String(type || '').toLowerCase();
+  if (normalizedType.includes('strength')) return 'barbell';
+  if (normalizedType.includes('run')) return 'walk';
+  if (normalizedType.includes('cycl') || normalizedType.includes('bike')) return 'bicycle';
+  if (normalizedType.includes('hike') || normalizedType.includes('trail')) return 'map';
+  if (normalizedType.includes('cardio')) return 'pulse';
+  return 'flash';
+};
+
 // Simple calendar month view with stars on completed days
 export default function CalendarScreen() {
   const completions = useSelector((s) => s.quests?.dailyCompletion || {});
@@ -16,7 +28,8 @@ export default function CalendarScreen() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(null); // 'YYYY-MM-DD'
   const { width: winW } = useWindowDimensions();
-  const maxGridWidth = Math.min(560, Math.max(320, Math.floor(winW - 32))); // leave side padding
+  const frameWidth = Math.min(winW, HOME_FRAME_WIDTH);
+  const maxGridWidth = Math.min(560, Math.max(320, Math.floor(frameWidth - 32))); // leave side padding
   const cellPx = Math.floor(maxGridWidth / 7) - 2; // -2 for gutter
 
   const { year, month, firstDayOfWeek, daysInMonth, monthLabel } = useMemo(() => {
@@ -212,10 +225,10 @@ export default function CalendarScreen() {
                 <ScrollView style={{ maxHeight: maxH }} contentContainerStyle={{ paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
                   {sessions.map((s, idx) => (
                     <View key={s.id || idx} style={styles.workoutItem}>
-                      <Ionicons name={s.type === 'strength' ? 'barbell' : (s.type === 'cardio' ? 'pulse' : 'flash')} size={18} color="#00eaff" />
+                      <Ionicons name={getSessionTypeIconName(s.type)} size={18} color="#00eaff" />
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.workoutTitle}>{s.title || 'Workout'}</Text>
-                        <Text style={styles.workoutMeta}>{`${s.durationMin ?? 0} min \u00b7 ${s.calories ?? 0} kcal`}</Text>
+                        <Text style={styles.workoutMeta}>{`${s.durationMin ?? 0} min \u00b7 ${s.calories ?? 0} kcal \u00b7 ${s.awardedXP ?? 0} XP`}</Text>
                       </View>
                     </View>
                   ))}

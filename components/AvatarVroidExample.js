@@ -1,5 +1,5 @@
 import React from 'react';
-import Avatar from './avatar';
+import InteractiveAvatar from './InteractiveAvatar';
 import { useVroidAuth } from './useVroidAuth';
 
 export default function AvatarVroidExample() {
@@ -39,7 +39,7 @@ export default function AvatarVroidExample() {
         <div>
           <h3>Selected Avatar Preview:</h3>
           <div style={{ width: '100%', height: 400, border: '1px solid #ccc', borderRadius: 8, overflow: 'hidden', background: '#f9f9f9' }}>
-            <Avatar model={selectedAvatarUrl} />
+            <InteractiveAvatar model={selectedAvatarUrl} enableVoice={true} enableTTS={true} />
           </div>
         </div>
       )}

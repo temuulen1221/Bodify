@@ -4,6 +4,8 @@ import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react
 import { useSelector } from 'react-redux';
 import { GRADIENTS } from '../utils/constants';
 
+const HOME_FRAME_WIDTH = 414;
+
 function monthKey(y, m) {
   return `${y}-${String(m + 1).padStart(2, '0')}`; // YYYY-MM
 }
@@ -11,6 +13,7 @@ function monthKey(y, m) {
 export default function MonthlyStepsChart({ monthsPerPage = 7, monthsTotal = 14, onPressWeekly }) {
   const stepsByDate = useSelector((s) => s.steps?.stepsByDate || {});
   const { width: SCREEN_W } = Dimensions.get('window');
+  const frameWidth = Math.min(SCREEN_W, HOME_FRAME_WIDTH);
   const pagerRef = useRef(null);
   const CARD_HPAD = 16; // matches Analysis card padding
 
@@ -40,7 +43,7 @@ export default function MonthlyStepsChart({ monthsPerPage = 7, monthsTotal = 14,
   }, [stepsByDate, monthsPerPage, monthsTotal]);
 
   const max = Math.max(1, ...data.map((d) => d.value));
-  const pageWidth = SCREEN_W - 2 * CARD_HPAD;
+  const pageWidth = frameWidth - 2 * CARD_HPAD;
 
   // Chunk months into pages
   const pages = useMemo(() => {

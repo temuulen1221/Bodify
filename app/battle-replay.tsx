@@ -1,12 +1,25 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentType, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import BackButton from '../components/BackButton';
-import Avatar from '../components/avatar';
+import InteractiveAvatar from '../components/InteractiveAvatar';
 import { BattleEvent, BattleParticipantInput, BattleResult, buildParticipantFromWorkout, generateBattleScript, mockBattleExample } from '../utils/battleScript';
 import { fallbackFriends, fetchFriendsForBattle } from '../utils/friendsData';
 
 const playDelayMs = 1100;
+
+type InteractiveAvatarProps = {
+  gender?: string;
+  sizeMultiplier?: number;
+  alignFootToBottom?: boolean;
+  bottomPadding?: number;
+  enableVoice?: boolean;
+  enableTTS?: boolean;
+  model?: string | null;
+  photoUri?: string | null;
+};
+
+const InteractiveAvatarComponent = InteractiveAvatar as unknown as ComponentType<InteractiveAvatarProps>;
 
 type BattleParams = {
   userName?: string;
@@ -248,12 +261,13 @@ const BattleReplay = () => {
           >
             <View style={styles.avatarSide}>
               <View style={styles.avatarFrame}>
-                <Avatar
+                <InteractiveAvatarComponent
                   gender="male"
                   sizeMultiplier={1.05}
-                  alignFootToBottom
+                  alignFootToBottom={true}
                   bottomPadding={0.04}
-                  playAnimation={false}
+                  enableVoice={false}
+                  enableTTS={false}
                   model={null}
                   photoUri={null}
                 />
@@ -265,19 +279,20 @@ const BattleReplay = () => {
             </View>
             <View style={styles.avatarSide}>
               <View style={styles.avatarFrame}>
-                <Avatar
+                <InteractiveAvatarComponent
                   gender="female"
                   sizeMultiplier={1.05}
-                  alignFootToBottom
+                  alignFootToBottom={true}
                   bottomPadding={0.04}
-                  playAnimation={false}
+                  enableVoice={false}
+                  enableTTS={false}
                   model={null}
                   photoUri={null}
                 />
               </View>
               <Text style={styles.sideLabel}>{rival.name}</Text>
             </View>
-            <Animated.View pointerEvents="none" style={[styles.hitFlash, { opacity: flash }]} />
+            <Animated.View style={[styles.hitFlash, { opacity: flash, pointerEvents: 'none' }]} />
           </Animated.View>
           <HPBar label={user.name} hp={hpUser} max={user.maxHp} color="#6A00FF" progressAnim={hpUserAnim} />
           <HPBar label={rival.name} hp={hpOpp} max={rival.maxHp} color="#00E7FF" progressAnim={hpOppAnim} />

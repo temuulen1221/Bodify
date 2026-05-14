@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "351839980449",
+    "project_id": "bodify-37337",
+    "storage_bucket": "bodify-37337.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:351839980449:android:408c8ec003e839e11a99e0",
+        "android_client_info": {
+          "package_name": "com.temuulen1221.bodify"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "351839980449-tmdig61k3mom0b5rpnncsg149hvb0da9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxmfvB28_oWtlOUSuWVgjAH3XH004jKl8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "351839980449-tmdig61k3mom0b5rpnncsg149hvb0da9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

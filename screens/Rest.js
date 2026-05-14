@@ -1,20 +1,16 @@
-import { useNavigation } from '@react-navigation/native';
-import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Animated, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackButton from '../components/BackButton';
-import RewardBadge from '../components/RewardBadge';
-import { COLORS, GRADIENTS } from '../utils/constants';
 
-const REST_TIPS = [
-  'Rest is just as important as training.',
-  'Take deep breaths and let your body recover.',
-  'Hydrate and stretch during your rest.',
-  'A short nap can boost your energy.',
-  'Mindful rest improves your next workout.'
-];
+const USE_NATIVE_DRIVER = false;
+const RECOVERY_COPY = {
+  eyebrow: 'STAND BY',
+  title: 'Build calm before the next set.',
+  subtitle: 'Take deep breaths and let your body recover.',
+  inhale: 'Fill the ribs slowly.',
+};
 
 const RECOVERY_ACTIONS = [
   { id: 'hydrate', title: 'Hydrate 200ml', detail: 'Slow sips calm your nervous system.' },
@@ -23,645 +19,511 @@ const RECOVERY_ACTIONS = [
   { id: 'log', title: 'Log mood', detail: 'Notice how you feel before lifting again.' },
 ];
 
-const FALLBACK_TRACKS = [
-  {
-    id: 'calm-waves',
-    title: 'Calm Waves',
-    length: '3:20',
-    url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_64bdeafdd2.mp3?filename=deep-relaxation-11062.mp3',
-  },
-  {
-    id: 'slow-breath',
-    title: 'Slow Breath',
-    length: '2:40',
-    url: 'https://cdn.pixabay.com/download/audio/2022/08/11/audio_c566e6f2a5.mp3?filename=meditation-ambient-112191.mp3',
-  },
-  {
-    id: 'focus-chimes',
-    title: 'Focus Chimes',
-    length: '1:55',
-    url: 'https://cdn.pixabay.com/download/audio/2022/02/15/audio_197b422ed2.mp3?filename=meditation-ambient-110066.mp3',
-  },
+const RECOVERY_MODES = [
+  { id: 'downshift', label: '2 min', subtitle: 'Quick downshift', minutes: 2 },
+  { id: 'full-reset', label: '5 min', subtitle: 'Full reset', minutes: 5 },
+  { id: 'deep-recovery', label: '10 min', subtitle: 'Deep recovery', minutes: 10 },
 ];
 
-const MEDITATION_API = 'https://raw.githubusercontent.com/github/covid19-dashboard/master/data/summary/dummy-meditation.json';
+const formatTime = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 
 export default function Rest() {
   const insets = useSafeAreaInsets();
+  const [selectedModeId, setSelectedModeId] = useState('full-reset');
   const [timer, setTimer] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [showBadge, setShowBadge] = useState(false);
-  const [tipIdx, setTipIdx] = useState(() => Math.floor(Math.random() * REST_TIPS.length));
   const [actions, setActions] = useState(RECOVERY_ACTIONS);
-  const [tracks, setTracks] = useState(FALLBACK_TRACKS);
-  const [currentTrackId, setCurrentTrackId] = useState(FALLBACK_TRACKS[0].id);
-  const [isAudioLoading, setIsAudioLoading] = useState(false);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const [audioError, setAudioError] = useState(null);
-  const [autoStarted, setAutoStarted] = useState(false);
-  const intervalRef = useRef(null);
-  const soundRef = useRef(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
   const breathAnim = useRef(new Animated.Value(1)).current;
-  const navigation = useNavigation();
+  const intervalRef = useRef(null);
 
-  React.useEffect(() => {
-    if (isRunning) {
-      intervalRef.current = setInterval(() => {
-        setTimer((t) => t + 1);
-      }, 1000);
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+  const selectedMode = useMemo(
+    () => RECOVERY_MODES.find((mode) => mode.id === selectedModeId) || RECOVERY_MODES[1],
+    [selectedModeId],
+  );
+
+  const totalSeconds = selectedMode.minutes * 60;
+  const remainingSeconds = Math.max(0, totalSeconds - timer);
+  const completedActionCount = actions.filter((item) => item.done).length;
+  const recoveryScore = completedActionCount * 25;
+  const progressRatio = totalSeconds > 0 ? Math.min(1, timer / totalSeconds) : 0;
+
+  useEffect(() => {
+    if (!isRunning) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return undefined;
     }
-    return () => intervalRef.current && clearInterval(intervalRef.current);
-  }, [isRunning]);
 
-  React.useEffect(() => {
-    if (timer > 0 && timer % 60 === 0) {
-      setShowBadge(true);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [timer]);
+    intervalRef.current = setInterval(() => {
+      setTimer((current) => {
+        if (current >= totalSeconds) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+          setIsRunning(false);
+          return totalSeconds;
+        }
+        return current + 1;
+      });
+    }, 1000);
 
-  React.useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isRunning, totalSeconds]);
+
+  useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(breathAnim, { toValue: 1.08, duration: 2800, useNativeDriver: true }),
-        Animated.timing(breathAnim, { toValue: 0.92, duration: 2600, useNativeDriver: true }),
+        Animated.timing(breathAnim, { toValue: 1.08, duration: 2800, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(breathAnim, { toValue: 0.92, duration: 2600, useNativeDriver: USE_NATIVE_DRIVER }),
       ]),
     );
     loop.start();
     return () => loop.stop();
   }, [breathAnim]);
 
-  React.useEffect(() => {
-    let cancelled = false;
-    const loadTracks = async () => {
-      try {
-        setIsAudioLoading(true);
-        const response = await fetch(MEDITATION_API);
-        if (!response.ok) throw new Error('Failed track fetch');
-        const payload = await response.json();
-        const normalized = (payload.tracks || payload || [])
-          .map((item, idx) => ({
-            id: item.id || item.slug || `api-track-${idx}`,
-            title: item.title || item.name || 'Meditation',
-            length: item.length || item.duration || '—',
-            url: item.url || item.audio || item.streamUrl,
-          }))
-          .filter((item) => item.url);
-        if (!cancelled && normalized.length) {
-          setTracks(normalized);
-          setCurrentTrackId(normalized[0].id);
-          setAudioError(null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setAudioError('Using fallback audio');
-          setTracks(FALLBACK_TRACKS);
-          setCurrentTrackId(FALLBACK_TRACKS[0].id);
-        }
-      } finally {
-        if (!cancelled) setIsAudioLoading(false);
-      }
-    };
+  const toggleAction = (actionId) => {
+    setActions((current) => current.map((action) => (
+      action.id === actionId ? { ...action, done: !action.done } : action
+    )));
+  };
 
-    const configureAudio = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          staysActiveInBackground: true,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: false,
-          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
-          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
-        });
-      } catch (err) {
-        // Ignore configuration errors; playback will still attempt
-      }
-    };
-
-    configureAudio();
-    loadTracks();
-
-    return () => {
-      cancelled = true;
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-    };
-  }, []);
+  const handleSelectMode = (modeId) => {
+    setSelectedModeId(modeId);
+    setTimer(0);
+    setIsRunning(false);
+  };
 
   const handleStart = () => setIsRunning(true);
-  const handlePause = () => setIsRunning(false);
   const handleReset = () => {
     setIsRunning(false);
     setTimer(0);
-    setShowBadge(false);
-    fadeAnim.setValue(0);
-    setTipIdx(Math.floor(Math.random() * REST_TIPS.length));
     setActions(RECOVERY_ACTIONS);
   };
 
-  const currentTrack = tracks.find((track) => track.id === currentTrackId) || tracks[0];
-
-  const playTrack = async (trackId) => {
-    const target = tracks.find((t) => t.id === trackId);
-    if (!target) return;
-    setIsAudioLoading(true);
-    setCurrentTrackId(trackId);
-    try {
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-      const { sound } = await Audio.Sound.createAsync({ uri: target.url }, { shouldPlay: true });
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) return;
-        if (status.didJustFinish) {
-          playNext();
-        }
-      });
-      soundRef.current = sound;
-      setIsAudioPlaying(true);
-      setAudioError(null);
-    } catch (err) {
-      setAudioError('Audio failed to load');
-      setIsAudioPlaying(false);
-    } finally {
-      setIsAudioLoading(false);
-    }
-  };
-
-  const togglePlayPause = async () => {
-    if (!currentTrack) return;
-    if (!soundRef.current) {
-      await playTrack(currentTrack.id);
-      return;
-    }
-    const status = await soundRef.current.getStatusAsync();
-    if (status.isPlaying) {
-      await soundRef.current.pauseAsync();
-      setIsAudioPlaying(false);
-    } else {
-      await soundRef.current.playAsync();
-      setIsAudioPlaying(true);
-    }
-  };
-
-  const playNext = () => {
-    if (!tracks.length) return;
-    const currentIdx = tracks.findIndex((t) => t.id === currentTrackId);
-    const nextIdx = (currentIdx + 1) % tracks.length;
-    playTrack(tracks[nextIdx].id);
-  };
-
-  React.useEffect(() => {
-    if (autoStarted) return;
-    if (isAudioLoading) return;
-    if (!tracks.length) return;
-    if (soundRef.current) return;
-
-    (async () => {
-      await playTrack(currentTrackId);
-      setAutoStarted(true);
-    })();
-  }, [autoStarted, isAudioLoading, tracks, currentTrackId]);
-
-  const toggleAction = (id) => {
-    setActions((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, done: !item.done } : item)),
-    );
-  };
-
-  const shuffleTip = () => {
-    setTipIdx((prev) => {
-      let next = Math.floor(Math.random() * REST_TIPS.length);
-      if (REST_TIPS.length > 1) {
-        while (next === prev) {
-          next = Math.floor(Math.random() * REST_TIPS.length);
-        }
-      }
-      return next;
-    });
-  };
-
-  // Format timer as mm:ss
-  const formatTime = (t) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
-
-  const contentPadding = {
-    paddingTop: 56 + (insets.top || 0),
-    paddingBottom: 28 + (insets.bottom || 12),
-    paddingHorizontal: 20,
-  };
-
   return (
-    <ImageBackground source={require('../assets/images/gym_background.jpg')} style={styles.bg} resizeMode="cover">
-      <LinearGradient colors={GRADIENTS.futuristic} style={styles.overlay} />
+    <ImageBackground source={require('../assets/images/gym_background.jpg')} style={styles.background} resizeMode="cover">
+      <LinearGradient colors={['rgba(8,14,28,0.55)', 'rgba(5,8,20,0.72)', 'rgba(3,7,18,0.85)']} style={styles.overlay} />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, contentPadding]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: Math.max(22, (insets.top || 0) + 14),
+            paddingBottom: Math.max(28, (insets.bottom || 0) + 18),
+          },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ position: 'absolute', top: (insets.top || 12), left: (insets.left || 12), zIndex: 2 }}>
-          <BackButton onPress={() => navigation.goBack()} />
+        <View style={styles.backButtonWrap}>
+          <BackButton />
         </View>
+
         <View style={styles.header}>
           <Text style={styles.title}>Recovery Lab</Text>
           <Text style={styles.subtitle}>Reset your nervous system before you push again.</Text>
         </View>
 
-        <View style={styles.grid}>
-          <View style={[styles.card, styles.gridItem, styles.timerCard]}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>Rest timer</Text>
-              <TouchableOpacity style={styles.chip} onPress={shuffleTip}>
-                <Text style={styles.chipText}>New tip</Text>
-              </TouchableOpacity>
+        <View style={styles.sessionCard}>
+          <View style={styles.sessionHeaderRow}>
+            <Text style={styles.sessionLabel}>Recovery session</Text>
+            <Text style={styles.sessionModeLabel}>{selectedMode.subtitle}</Text>
+          </View>
+
+          <Text style={styles.eyebrow}>{RECOVERY_COPY.eyebrow}</Text>
+          <Text style={styles.sessionTitle}>{RECOVERY_COPY.title}</Text>
+          <Text style={styles.sessionSubtitle}>{RECOVERY_COPY.subtitle}</Text>
+
+          <Animated.View style={[styles.breathPromptCard, { transform: [{ scale: breathAnim }] }]}> 
+            <Text style={styles.breathPromptLabel}>INHALE</Text>
+            <Text style={styles.breathPromptValue}>4s</Text>
+          </Animated.View>
+
+          <View style={styles.metricRow}>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricValue}>{recoveryScore}</Text>
+              <Text style={styles.metricLabel}>Recovery score</Text>
             </View>
-            <Text style={styles.timer}>{formatTime(timer)}</Text>
-            <Text style={styles.tip}>{REST_TIPS[tipIdx]}</Text>
-            <View style={styles.timerBtns}>
-              {!isRunning ? (
-                <TouchableOpacity style={[styles.btn, styles.primaryBtn]} onPress={handleStart}>
-                  <Text style={styles.btnText}>Start</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={[styles.btn, styles.primaryBtn]} onPress={handlePause}>
-                  <Text style={styles.btnText}>Pause</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={[styles.btn, styles.ghostBtn]} onPress={handleReset}>
-                <Text style={styles.btnText}>Reset</Text>
-              </TouchableOpacity>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricValue}>{formatTime(remainingSeconds)}</Text>
+              <Text style={styles.metricLabel}>Remaining</Text>
+            </View>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricValue}>{`${completedActionCount}/${actions.length}`}</Text>
+              <Text style={styles.metricLabel}>Checklist</Text>
             </View>
           </View>
 
-          <View style={[styles.card, styles.gridItem, styles.breatheCard]}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>Breathing cadence</Text>
-              <Text style={styles.meta}>Box breathing</Text>
+          <View style={styles.modeRow}>
+            {RECOVERY_MODES.map((mode) => {
+              const selected = mode.id === selectedModeId;
+              return (
+                <TouchableOpacity
+                  key={mode.id}
+                  activeOpacity={0.88}
+                  onPress={() => handleSelectMode(mode.id)}
+                  style={[styles.modePill, selected && styles.modePillSelected]}
+                >
+                  <Text style={[styles.modeLabel, selected && styles.modeLabelSelected]}>{mode.label}</Text>
+                  <Text style={[styles.modeSubtitle, selected && styles.modeSubtitleSelected]}>{mode.subtitle}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${Math.max(8, progressRatio * 100)}%` }]} />
+          </View>
+
+          <View style={styles.bottomPanelRow}>
+            <View style={styles.timerPanel}>
+              <Text style={styles.timerText}>{formatTime(timer)}</Text>
+              <Text style={styles.timerTargetText}>{`Target: ${selectedMode.minutes} min recovery block`}</Text>
+              <View style={styles.timerButtonRow}>
+                <TouchableOpacity activeOpacity={0.88} onPress={handleStart} style={[styles.primaryButton, isRunning && styles.primaryButtonMuted]}>
+                  <Text style={styles.primaryButtonText}>{isRunning ? 'Running' : 'Start'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.88} onPress={handleReset} style={styles.secondaryButton}>
+                  <Text style={styles.secondaryButtonText}>Reset</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <Animated.View style={[styles.breathCircle, { transform: [{ scale: breathAnim }] }]}
-              accessible
-              accessibilityLabel="Breathing circle"
-            >
-              <Text style={styles.breathText}>In 4s • Hold 2s • Out 4s</Text>
-            </Animated.View>
-            <Text style={styles.helper}>Match your inhale to the pulse; longer exhales lower heart rate.</Text>
+
+            <View style={styles.inhalePanel}>
+              <Text style={styles.inhaleTitle}>Inhale</Text>
+              <Text style={styles.inhaleSubtitle}>{RECOVERY_COPY.inhale}</Text>
+            </View>
           </View>
         </View>
 
-        <View style={[styles.card, styles.actionsCard]}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardLabel}>Reset checklist</Text>
-            <Text style={styles.meta}>{actions.filter((a) => a.done).length}/{actions.length} done</Text>
+        <View style={styles.checklistPanel}>
+          <View style={styles.checklistHeaderRow}>
+            <Text style={styles.checklistTitle}>Reset checklist</Text>
+            <Text style={styles.checklistMeta}>{`${completedActionCount}/${actions.length} done`}</Text>
           </View>
-          <View style={styles.actionGrid}>
-            {actions.map((item) => (
+          <View style={styles.checklistGrid}>
+            {actions.map((action) => (
               <TouchableOpacity
-                key={item.id}
-                onPress={() => toggleAction(item.id)}
-                style={[styles.actionPill, item.done && styles.actionPillDone]}
+                key={action.id}
+                activeOpacity={0.88}
+                onPress={() => toggleAction(action.id)}
+                style={[styles.checklistItem, action.done && styles.checklistItemDone]}
               >
-                <Text style={styles.actionTitle}>{item.title}</Text>
-                <Text style={styles.actionDetail}>{item.detail}</Text>
+                <Text style={styles.checklistItemTitle}>{action.title}</Text>
+                <Text style={styles.checklistItemDetail}>{action.detail}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
-
-        <View style={[styles.card, styles.audioCard]}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardLabel}>Meditation audio</Text>
-            <Text style={styles.meta}>{audioError ? 'Fallback' : 'API + fallback'}</Text>
-          </View>
-          <View style={styles.trackList}>
-            {tracks.map((track) => {
-              const active = track.id === currentTrackId;
-              return (
-                <TouchableOpacity
-                  key={track.id}
-                  style={[styles.trackChip, active && styles.trackChipActive]}
-                  onPress={() => playTrack(track.id)}
-                >
-                  <Text style={styles.trackTitle}>{track.title}</Text>
-                  <Text style={styles.trackMeta}>{track.length}</Text>
-                </TouchableOpacity>
-              );
-            })}
-            {isAudioLoading && (
-              <View style={styles.loaderRow}>
-                <ActivityIndicator color={COLORS.neonCyan} />
-                <Text style={styles.helper}>Loading track...</Text>
-              </View>
-            )}
-          </View>
-          {currentTrack && (
-            <View style={styles.audioRow}>
-              <View>
-                <Text style={styles.trackNow}>{currentTrack.title}</Text>
-                <Text style={styles.trackMetaSmall}>Guided calm</Text>
-              </View>
-              <View style={styles.audioBtns}>
-                <TouchableOpacity style={[styles.btn, styles.ghostBtn]} onPress={playNext}>
-                  <Text style={styles.btnText}>Next</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.btn, styles.primaryBtn]} onPress={togglePlayPause}>
-                  <Text style={styles.btnText}>{isAudioPlaying ? 'Pause' : 'Play'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          {audioError && <Text style={styles.audioError}>{audioError}</Text>}
-        </View>
-
-        {showBadge && (
-          <Animated.View style={[styles.badgeWrap, { opacity: fadeAnim }]}> 
-            <RewardBadge label="Rest XP" value={10} />
-            <Text style={styles.badgeText}>Great job resting!</Text>
-          </Animated.View>
-        )}
       </ScrollView>
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  bg: {
+  background: {
     flex: 1,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scroll: {
-    flex: 1,
-    width: '100%',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.7,
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
-    flex: 1,
-    alignItems: 'stretch',
-    justifyContent: 'flex-start',
-    gap: 14,
+    paddingHorizontal: 18,
+    gap: 18,
+  },
+  backButtonWrap: {
+    alignSelf: 'flex-start',
+    zIndex: 2,
   },
   header: {
-    gap: 6,
-    marginBottom: 4,
+    marginTop: 4,
+    gap: 8,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: COLORS.neonCyan,
-    textShadowColor: COLORS.neonPurple,
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    color: '#00D6FF',
+    fontSize: 28,
+    fontWeight: '900',
   },
   subtitle: {
-    fontSize: 16,
-    color: COLORS.white,
-    opacity: 0.85,
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '600',
   },
-  grid: {
-    flexDirection: 'row',
-    gap: 14,
-    flexWrap: 'wrap',
-  },
-  card: {
-    backgroundColor: COLORS.glassDark,
-    borderRadius: 18,
-    padding: 16,
-    shadowColor: COLORS.neonCyan,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
+  sessionCard: {
+    borderRadius: 28,
+    padding: 18,
+    backgroundColor: 'rgba(10, 18, 34, 0.58)',
     borderWidth: 1,
-    borderColor: COLORS.glassDarker,
+    borderColor: 'rgba(0,231,255,0.28)',
+    overflow: 'hidden',
   },
-  gridItem: {
-    flex: 1,
-    minWidth: '48%',
-  },
-  cardHeader: {
+  sessionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  cardLabel: {
-    color: COLORS.white,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    fontSize: 14,
-  },
-  chip: {
-    backgroundColor: COLORS.neonPurple,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  chipText: {
-    color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
-  timerCard: {
-    flex: 1.2,
-  },
-  timer: {
-    fontSize: 44,
-    fontWeight: 'bold',
-    color: COLORS.neonMagenta,
-    marginBottom: 12,
-    letterSpacing: 2,
-  },
-  tip: {
-    fontSize: 16,
-    color: COLORS.white,
     marginBottom: 16,
-    textAlign: 'left',
-    fontStyle: 'italic',
-    backgroundColor: COLORS.glassDarker,
-    padding: 10,
-    borderRadius: 12,
   },
-  timerBtns: {
+  sessionLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  sessionModeLabel: {
+    color: '#FF00F5',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  eyebrow: {
+    color: '#FF00F5',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.6,
+    marginBottom: 8,
+  },
+  sessionTitle: {
+    color: '#F8FBFF',
+    fontSize: 26,
+    lineHeight: 37,
+    fontWeight: '900',
+    maxWidth: 260,
+  },
+  sessionSubtitle: {
+    marginTop: 12,
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 14,
+    lineHeight: 22,
+    maxWidth: 320,
+  },
+  breathPromptCard: {
+    marginTop: 18,
+    width: 112,
+    borderRadius: 24,
+    backgroundColor: 'rgba(6, 10, 22, 0.7)',
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  breathPromptLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  breathPromptValue: {
+    marginTop: 8,
+    color: '#00D6FF',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  metricRow: {
+    marginTop: 18,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  metricCard: {
+    flex: 1,
+    minHeight: 88,
+    borderRadius: 18,
+    backgroundColor: 'rgba(5, 8, 18, 0.72)',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    justifyContent: 'space-between',
+  },
+  metricValue: {
+    color: '#00D6FF',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  metricLabel: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modeRow: {
+    marginTop: 18,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modePill: {
+    flex: 1,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(5, 8, 18, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  modePillSelected: {
+    borderColor: 'rgba(0,231,255,0.95)',
+    backgroundColor: 'rgba(0,231,255,0.12)',
+  },
+  modeLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  modeLabelSelected: {
+    color: '#00E7FF',
+  },
+  modeSubtitle: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.64)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modeSubtitleSelected: {
+    color: 'rgba(255,255,255,0.86)',
+  },
+  progressTrack: {
+    marginTop: 16,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#16D9FF',
+  },
+  bottomPanelRow: {
+    marginTop: 18,
     flexDirection: 'row',
     gap: 12,
-    marginTop: 4,
+    alignItems: 'stretch',
   },
-  btn: {
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 14,
+  timerPanel: {
     flex: 1,
-    alignItems: 'center',
+    borderRadius: 22,
+    backgroundColor: 'rgba(5, 8, 18, 0.78)',
+    padding: 16,
+    justifyContent: 'space-between',
   },
-  primaryBtn: {
-    backgroundColor: COLORS.neonPurple,
+  timerText: {
+    color: '#FF00F5',
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: 1.5,
   },
-  ghostBtn: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.neonPurple,
-  },
-  btnText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-    fontSize: 15,
-    letterSpacing: 0.5,
-  },
-  breatheCard: {
-    flex: 1,
-  },
-  breathCircle: {
-    width: '100%',
-    aspectRatio: 1.2,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: COLORS.neonMagenta,
-    backgroundColor: COLORS.glassDarker,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  breathText: {
-    color: COLORS.neonCyan,
-    fontWeight: '700',
-    fontSize: 16,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  helper: {
-    color: COLORS.white,
-    opacity: 0.9,
+  timerTargetText: {
+    marginTop: 10,
+    color: 'rgba(255,255,255,0.82)',
     fontSize: 13,
+    fontWeight: '600',
   },
-  meta: {
-    color: COLORS.neonMagenta,
-    fontSize: 12,
-    letterSpacing: 0.5,
-    fontWeight: '700',
-  },
-  actionsCard: {
-    width: '100%',
-  },
-  audioCard: {
-    width: '100%',
-  },
-  actionGrid: {
+  timerButtonRow: {
+    marginTop: 16,
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 10,
   },
-  actionPill: {
-    flexBasis: '48%',
-    backgroundColor: COLORS.glassDarker,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.neonPurple,
-  },
-  actionPillDone: {
-    backgroundColor: 'rgba(0, 255, 170, 0.1)',
-    borderColor: COLORS.neonCyan,
-  },
-  actionTitle: {
-    color: COLORS.white,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  actionDetail: {
-    color: COLORS.white,
-    opacity: 0.85,
-    fontSize: 12,
-  },
-  trackList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  trackChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: COLORS.glassDarker,
-    borderWidth: 1,
-    borderColor: COLORS.glassDarker,
-    minWidth: '45%',
-  },
-  trackChipActive: {
-    borderColor: COLORS.neonCyan,
-    backgroundColor: 'rgba(0, 255, 170, 0.08)',
-  },
-  trackTitle: {
-    color: COLORS.white,
-    fontWeight: '700',
-  },
-  trackMeta: {
-    color: COLORS.white,
-    opacity: 0.8,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  loaderRow: {
-    flexDirection: 'row',
+  primaryButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 16,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    backgroundColor: '#6A00FF',
   },
-  audioRow: {
+  primaryButtonMuted: {
+    opacity: 0.78,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  secondaryButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(106,0,255,0.9)',
+    backgroundColor: 'rgba(106,0,255,0.08)',
+  },
+  secondaryButtonText: {
+    color: '#F5F8FE',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  inhalePanel: {
+    width: 152,
+    borderRadius: 22,
+    backgroundColor: 'rgba(5, 8, 18, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,0,245,0.58)',
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    justifyContent: 'center',
+  },
+  inhaleTitle: {
+    color: '#00D6FF',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  inhaleSubtitle: {
+    marginTop: 10,
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '600',
+  },
+  checklistPanel: {
+    borderRadius: 24,
+    padding: 16,
+    backgroundColor: 'rgba(10, 18, 34, 0.54)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,231,255,0.22)',
+  },
+  checklistHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 10,
+    marginBottom: 12,
   },
-  audioBtns: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
+  checklistTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
   },
-  trackNow: {
-    color: COLORS.neonCyan,
+  checklistMeta: {
+    color: '#00E7FF',
+    fontSize: 12,
     fontWeight: '800',
-    fontSize: 16,
   },
-  trackMetaSmall: {
-    color: COLORS.white,
-    opacity: 0.8,
-    fontSize: 12,
-  },
-  audioError: {
-    color: COLORS.neonMagenta,
-    marginTop: 8,
-    fontSize: 12,
-  },
-  badgeWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  checklistGrid: {
     gap: 10,
-    marginTop: 12,
-    backgroundColor: COLORS.glassDarker,
-    borderRadius: 16,
-    padding: 10,
-    shadowColor: COLORS.neonCyan,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
   },
-  badgeText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-    fontSize: 16,
-    letterSpacing: 1,
+  checklistItem: {
+    borderRadius: 18,
+    backgroundColor: 'rgba(5, 8, 18, 0.72)',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  checklistItemDone: {
+    borderColor: 'rgba(0,231,255,0.58)',
+    backgroundColor: 'rgba(0,231,255,0.08)',
+  },
+  checklistItemTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  checklistItemDetail: {
+    marginTop: 6,
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
   },
 });

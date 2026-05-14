@@ -4,13 +4,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { Href } from 'expo-router';
 import { Tabs, router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Path, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg';
+import ScreenFrame from '../../components/ScreenFrame';
+
+const USE_NATIVE_DRIVER = false;
 
 function FancyTabBar(props: BottomTabBarProps) {
   const { state, navigation } = props;
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current; // 0 closed, 1 open
   const sweep = useRef(new Animated.Value(0)).current; // animated glow sweep 0..1
@@ -21,7 +25,7 @@ function FancyTabBar(props: BottomTabBarProps) {
     setOpen(!open);
     Animated.spring(anim, {
       toValue: to,
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
       friction: 7,
       tension: 140,
     }).start();
@@ -31,8 +35,8 @@ function FancyTabBar(props: BottomTabBarProps) {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(sweep, { toValue: 1, duration: 5000, useNativeDriver: true }),
-        Animated.timing(sweep, { toValue: 0, duration: 5000, useNativeDriver: true }),
+        Animated.timing(sweep, { toValue: 1, duration: 5000, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(sweep, { toValue: 0, duration: 5000, useNativeDriver: USE_NATIVE_DRIVER }),
       ])
     ).start();
   }, [sweep]);
@@ -41,19 +45,24 @@ function FancyTabBar(props: BottomTabBarProps) {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(ringPulse, { toValue: 0.4, duration: 900, useNativeDriver: true }),
-        Animated.timing(ringPulse, { toValue: 0.18, duration: 900, useNativeDriver: true }),
+        Animated.timing(ringPulse, { toValue: 0.4, duration: 900, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(ringPulse, { toValue: 0.18, duration: 900, useNativeDriver: USE_NATIVE_DRIVER }),
       ])
     ).start();
   }, [ringPulse]);
 
-  const navigateTo = (name: string) => {
-    const index = state.routes.findIndex(r => r.name === name);
-    if (index >= 0) navigation.navigate(state.routes[index].name as never);
+  const navigateTo = (href: Href) => {
+    router.replace(href);
   };
 
   const activeColor = '#00E7FF';
   const inactiveColor = 'rgba(0,231,255,0.6)';
+  const frameWidth = Math.min(windowWidth, 414);
+  const frameHeight = Math.min(windowHeight, 896);
+  const frameBottomInset = Math.max(0, (windowHeight - frameHeight) / 2);
+  const barWidthPx = Math.min(frameWidth - 24, 370);
+  const shadowWidthPx = Math.max(0, barWidthPx - 18);
+  const glowWidthPx = Math.max(0, barWidthPx - 6);
 
   const leftRoute = useMemo(() => state.routes[0], [state.routes]);
   const centerRoute = useMemo(() => state.routes[1], [state.routes]);
@@ -99,12 +108,12 @@ function FancyTabBar(props: BottomTabBarProps) {
   };
 
   return (
-    <View pointerEvents="box-none" style={[styles.root, { paddingBottom: Math.max(insets.bottom, 10) }]}
+    <View style={[styles.root, { bottom: frameBottomInset, paddingBottom: Math.max(insets.bottom, 10), pointerEvents: 'box-none' }]}
     >
       {/* Bottom bar background */}
-      <View pointerEvents="none" style={styles.barShadow} />
-      <View pointerEvents="none" style={styles.barGlow} />
-      <View style={styles.bar} onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}>
+      <View style={[styles.barShadow, { width: shadowWidthPx, pointerEvents: 'none' }]} />
+      <View style={[styles.barGlow, { width: glowWidthPx, pointerEvents: 'none' }]} />
+      <View style={[styles.bar, { width: barWidthPx }]} onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}>
         {/* Notched SVG background */}
         {barWidth > 0 && (
           <Svg style={StyleSheet.absoluteFill} width={barWidth} height={BAR_HEIGHT} viewBox={`0 0 ${barWidth} ${BAR_HEIGHT}`}>
@@ -121,9 +130,9 @@ function FancyTabBar(props: BottomTabBarProps) {
         {/* Animated glow sweep */}
         {barWidth > 0 && (
           <Animated.View
-            pointerEvents="none"
             style={[
               styles.glowSweep,
+              { pointerEvents: 'none' },
               {
                 transform: [
                   {
@@ -145,9 +154,9 @@ function FancyTabBar(props: BottomTabBarProps) {
         <Pressable
           style={styles.tabItem}
           onPress={() => {
-            navigateTo(leftRoute.name);
+            navigateTo('/(tabs)/Calendar');
           }}
-          onLongPress={() => navigateTo(leftRoute.name)}
+          onLongPress={() => navigateTo('/(tabs)/Calendar')}
         >
           <Ionicons
             name="calendar-outline"
@@ -157,7 +166,7 @@ function FancyTabBar(props: BottomTabBarProps) {
         </Pressable>
 
         {/* Center FAB */}
-        <View pointerEvents="box-none" style={styles.centerSlot}>
+        <View style={[styles.centerSlot, { pointerEvents: 'box-none' }]}>
           <Animated.View
             style={{
               transform: [
@@ -169,7 +178,7 @@ function FancyTabBar(props: BottomTabBarProps) {
             <Pressable
               onPress={() => {
                 // Navigate Home on tap, also close actions if open
-                navigateTo(centerRoute.name);
+                navigateTo('/(tabs)/Home');
                 if (open) toggleOpen();
               }}
               onLongPress={toggleOpen}
@@ -191,9 +200,9 @@ function FancyTabBar(props: BottomTabBarProps) {
         <Pressable
           style={styles.tabItem}
           onPress={() => {
-            navigateTo(rightRoute.name);
+            navigateTo('/(tabs)/Workout');
           }}
-          onLongPress={() => navigateTo(rightRoute.name)}
+          onLongPress={() => navigateTo('/(tabs)/Workout')}
         >
           <MaterialCommunityIcons
             name="dumbbell"
@@ -204,7 +213,7 @@ function FancyTabBar(props: BottomTabBarProps) {
       </View>
 
       {/* Floating Actions (rendered last to appear above bar background) */}
-      <View pointerEvents={open ? 'auto' : 'none'} style={styles.actionsLayer}>
+      {open ? <View style={styles.actionsLayer}>
         {/* Left action (up-left) */}
         <Animated.View
           style={[
@@ -220,7 +229,7 @@ function FancyTabBar(props: BottomTabBarProps) {
             },
           ]}
         >
-          <Pressable onPress={() => { router.push('/diet' as Href); if (open) toggleOpen(); }} style={styles.actionPressable}>
+          <Pressable onPress={() => { router.push('/(tabs)/diet' as Href); if (open) toggleOpen(); }} style={styles.actionPressable}>
             <LinearGradient colors={["#5421FF", "#6A00FF", "#00E7FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionCircle}>
               <Ionicons name="nutrition-outline" size={22} color="#fff" />
             </LinearGradient>
@@ -241,7 +250,7 @@ function FancyTabBar(props: BottomTabBarProps) {
             },
           ]}
         >
-          <Pressable onPress={() => { router.push('/social' as Href); if (open) toggleOpen(); }} style={styles.actionPressable}>
+          <Pressable onPress={() => { router.push('/(tabs)/social' as Href); if (open) toggleOpen(); }} style={styles.actionPressable}>
             <LinearGradient colors={["#5421FF", "#6A00FF", "#00E7FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionCircle}>
               <MaterialCommunityIcons name="account-group-outline" size={22} color="#fff" />
             </LinearGradient>
@@ -262,34 +271,36 @@ function FancyTabBar(props: BottomTabBarProps) {
             },
           ]}
         >
-          <Pressable onPress={() => { router.push('/achievements' as Href); if (open) toggleOpen(); }} style={styles.actionPressable}>
+          <Pressable onPress={() => { router.push('/(tabs)/achievements' as Href); if (open) toggleOpen(); }} style={styles.actionPressable}>
             <LinearGradient colors={["#5421FF", "#6A00FF", "#00E7FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionCircle}>
               <Ionicons name="trophy-outline" size={22} color="#fff" />
             </LinearGradient>
           </Pressable>
         </Animated.View>
-      </View>
+      </View> : null}
     </View>
   );
 }
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <FancyTabBar {...(props as BottomTabBarProps)} />}
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen name="Calendar" options={{ title: 'Calendar' }} />
-      <Tabs.Screen name="Home" options={{ title: 'Home' }} />
-      <Tabs.Screen name="Workout" options={{ title: 'Workout' }} />
-      {/* Hidden routes for floating actions */}
-  <Tabs.Screen name="settings" options={{ href: null }} />
-  <Tabs.Screen name="diet" options={{ href: null }} />
-      <Tabs.Screen name="social" options={{ href: null }} />
-      <Tabs.Screen name="achievements" options={{ href: null }} />
-    </Tabs>
+    <ScreenFrame backgroundColor="#0b1020" shadow={false}>
+      <Tabs
+        tabBar={(props) => <FancyTabBar {...(props as BottomTabBarProps)} />}
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: 'transparent' },
+        }}
+      >
+        <Tabs.Screen name="Calendar" options={{ title: 'Calendar' }} />
+        <Tabs.Screen name="Home" options={{ title: 'Home' }} />
+        <Tabs.Screen name="Workout" options={{ title: 'Workout' }} />
+        {/* Hidden routes for floating actions */}
+          <Tabs.Screen name="diet" options={{ href: null }} />
+        <Tabs.Screen name="social" options={{ href: null }} />
+        <Tabs.Screen name="achievements" options={{ href: null }} />
+      </Tabs>
+    </ScreenFrame>
   );
 }
 
@@ -332,7 +343,6 @@ const styles = StyleSheet.create({
   barShadow: {
     position: 'absolute',
     bottom: 22,
-    width: '82%',
     height: 44,
     borderRadius: 22,
     backgroundColor: 'rgba(0,0,0,0.25)',
@@ -341,7 +351,6 @@ const styles = StyleSheet.create({
   barGlow: {
     position: 'absolute',
     bottom: 22,
-    width: '86%',
     height: 56,
     borderRadius: 28,
     backgroundColor: 'rgba(106,0,255,0.25)',
@@ -350,7 +359,6 @@ const styles = StyleSheet.create({
   bar: {
     position: 'absolute',
     bottom: 24,
-    width: '86%',
     height: 56,
     borderRadius: 28,
     flexDirection: 'row',

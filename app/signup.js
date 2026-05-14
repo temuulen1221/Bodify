@@ -4,8 +4,11 @@ import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'fire
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import ScreenFrame from '../components/ScreenFrame';
 import { auth, db } from '../services/firebase';
 import { COLORS, GRADIENTS } from '../utils/constants';
+
+const DEFAULT_LEVEL_CAP = 100;
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -54,7 +57,20 @@ export default function SignUpScreen() {
             email: cred.user.email || e,
             createdAt: serverTimestamp(),
             points: 0,
-            pointsMax: 0,
+            pointsMax: DEFAULT_LEVEL_CAP,
+            totalXP: 0,
+            energy: 0,
+            discountTickets: 0,
+            streakShields: 0,
+            ownedShopItems: [],
+            streakCount: 0,
+            bestStreak: 0,
+            lastWorkoutDate: null,
+            recentRewards: [],
+            lastRewardAt: null,
+            lastLevelUpAt: null,
+            lastLevelUpReward: null,
+            lastLevelUpModalSeenAt: null,
             achievements: [],
             progress: 0,
             avatarName: '',
@@ -64,7 +80,11 @@ export default function SignUpScreen() {
             photoUri: '',
             gender: '',
             level: 1,
-            dailyQuests: []
+            dailyStepGoal: 10000,
+            weeklyWorkoutGoal: 5,
+            targetWeight: '',
+            dailyQuests: [],
+            avatarSetupComplete: false
           },
           { merge: true }
         );
@@ -79,13 +99,14 @@ export default function SignUpScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <LinearGradient colors={GRADIENTS.futuristic} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.gradientBg}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }} keyboardShouldPersistTaps="handled">
-          <View style={styles.card}>
+    <ScreenFrame>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <LinearGradient colors={GRADIENTS.futuristic} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.gradientBg}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }} keyboardShouldPersistTaps="handled">
+            <View style={styles.card}>
             <Text style={styles.title}>Create Account</Text>
             <TextInput
               style={styles.input}
@@ -127,10 +148,11 @@ export default function SignUpScreen() {
             <TouchableOpacity onPress={() => router.replace('/login')} style={styles.switchLink}>
               <Text style={styles.switchText}>Already have an account ? Login </Text>
             </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </LinearGradient>
-    </KeyboardAvoidingView>
+            </View>
+          </ScrollView>
+        </LinearGradient>
+      </KeyboardAvoidingView>
+    </ScreenFrame>
   );
 }
 

@@ -8,6 +8,8 @@ import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { GRADIENTS } from '../utils/constants';
 
+const HOME_FRAME_WIDTH = 414;
+
 function formatKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -37,6 +39,7 @@ function formatRangeLabel(start, end) {
 export default function WeeklyWorkoutsChart({ weeksBack = 8, weekStartsOn = 1 }) {
   const sessionsByDate = useSelector((s) => s.workouts?.sessionsByDate || {});
   const { width: SCREEN_W } = Dimensions.get('window');
+  const frameWidth = Math.min(SCREEN_W, HOME_FRAME_WIDTH);
   const pagerRef = useRef(null);
 
   const data = useMemo(() => {
@@ -66,16 +69,16 @@ export default function WeeklyWorkoutsChart({ weeksBack = 8, weekStartsOn = 1 })
 
   // Auto-snap to most recent week
   useEffect(() => {
-    const pageWidth = SCREEN_W - 2 * 16; // match Analysis card padding
+    const pageWidth = frameWidth - 2 * 16; // match Analysis card padding
     if (!pagerRef.current || !data || data.length <= 1 || pageWidth <= 0) return;
     const x = pageWidth * (data.length - 1);
     const t = setTimeout(() => {
       try { pagerRef.current.scrollTo({ x, y: 0, animated: false }); } catch {}
     }, 0);
     return () => clearTimeout(t);
-  }, [data, SCREEN_W]);
+  }, [data, frameWidth]);
 
-  const pageWidth = SCREEN_W - 2 * 16;
+  const pageWidth = frameWidth - 2 * 16;
 
   return (
     <View style={styles.card}>

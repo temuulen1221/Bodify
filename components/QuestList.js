@@ -1,15 +1,18 @@
 import * as Location from 'expo-location';
-import { Pedometer } from 'expo-sensors';
 import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSelector } from 'react-redux';
 import { currentUserId, db } from '../services/firebase'; // Adjust path
 
 const QuestList = () => {
   const [quests, setQuests] = useState([]);
-  const [stepCount, setStepCount] = useState(0);
   const [distance, setDistance] = useState(0);
   const [prevLocation, setPrevLocation] = useState(null);
+  const stepsByDate = useSelector((s) => s.steps?.stepsByDate || {});
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const stepCount = Number(stepsByDate[todayKey] || 0);
 
   useEffect(() => {
     if (!currentUserId) return; // Wait for user auth
@@ -43,16 +46,8 @@ const QuestList = () => {
     });
 
     // Sensor setup
-    let pedometerSubscription, locationSubscription;
+    let locationSubscription;
     const startSensors = async () => {
-      const isPedometerAvailable = await Pedometer.isAvailableAsync();
-      if (isPedometerAvailable) {
-        pedometerSubscription = Pedometer.watchStepCount((data) => {
-          setStepCount(data.steps);
-          checkQuestCompletion(data.steps, '3');
-        });
-      }
-
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
         locationSubscription = await Location.watchPositionAsync(
@@ -68,12 +63,15 @@ const QuestList = () => {
 
   return () => {
       unsubscribe();
-      pedometerSubscription && pedometerSubscription.remove();
       locationSubscription && locationSubscription.remove();
     };
     // NOTE: calculateDistance and checkQuestCompletion are stable helpers defined below; add an
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
+
+  useEffect(() => {
+    checkQuestCompletion(stepCount, '3');
+  }, [stepCount, quests]);
 
   const calculateDistance = (newCoords) => {
     if (prevLocation && newCoords) {

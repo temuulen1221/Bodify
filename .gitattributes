@@ -1,0 +1,13 @@
+* text=auto
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.mp3 binary
+*.wav binary
+*.glb binary
+*.vrm binary
+*.fbx binary
+*.pdf binary

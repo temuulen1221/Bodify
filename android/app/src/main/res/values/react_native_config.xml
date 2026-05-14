@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="react_fabric_enabled">false</bool>
+    <bool name="react_native_new_arch_enabled">false</bool>
+    <bool name="react_enable_bridgeless">false</bool>
+    <bool name="react_enable_turbomodules">false</bool>
+</resources>

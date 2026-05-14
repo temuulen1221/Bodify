@@ -1,26 +1,36 @@
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
+
+const FALLBACK_ROUTES = {
+  '/Workout': '/(tabs)/Home',
+  '/Pose': '/(tabs)/Home',
+};
 
 const BackButton = ({ label: _label = 'Back', onPress = undefined }) => {
   const nav = useNavigation();
   const router = useRouter?.();
+  const pathname = usePathname?.() || '';
 
   const handlePress = () => {
     if (typeof onPress === 'function') {
       onPress();
       return;
     }
-    if (router?.canGoBack?.()) {
-      router.back();
-      return;
-    }
+
     if (nav?.canGoBack?.()) {
       nav.goBack();
       return;
     }
-    router?.push?.('/') || nav?.navigate?.('Home');
+
+    if (router?.canGoBack?.()) {
+      router.back();
+      return;
+    }
+
+    const fallbackRoute = FALLBACK_ROUTES[pathname] || '/(tabs)/Home';
+    router?.replace?.(fallbackRoute) || router?.push?.(fallbackRoute) || nav?.navigate?.('Home');
   };
 
   return (

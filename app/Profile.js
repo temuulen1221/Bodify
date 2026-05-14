@@ -1,1 +1,10 @@
-export { default } from '../screens/Profile';
+import ScreenFrame from '../components/ScreenFrame';
+import ProfileScreen from '../screens/Profile';
+
+export default function ProfileRoute() {
+	return (
+		<ScreenFrame>
+			<ProfileScreen />
+		</ScreenFrame>
+	);
+}

@@ -1,43 +1,47 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack } from "expo-router";
+import { onAuthStateChanged } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Provider, useDispatch } from 'react-redux';
+import BadgeLevelUpModal from '../components/BadgeLevelUpModal';
+import LevelUpRewardModal from '../components/LevelUpRewardModal';
 import { ensureBackgroundStepTaskRegistered } from '../services/backgroundSteps';
-import { loadAwardsState, loadUserState } from '../services/storage';
-import store, { hydrateQuests, hydrateUser, hydrateWorkouts } from '../store';
+import { auth } from '../services/firebase';
+import { startGlobalStepTracking } from '../services/stepsService';
+import { loadAwardsState, loadRemoteUserState, loadStepsState, loadUserState, mergeHydratedUserState } from '../services/storage';
+import store, { hydrateQuests, hydrateSteps, hydrateUser, hydrateWorkouts } from '../store';
 
-const GradientHeader = ({ title }: { title: string }) => (
-  <LinearGradient
-    colors={["#5421FF", "#6A00FF", "#00E7FF"]}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={{ flex: 1, justifyContent: 'flex-end' }}
-  >
-    <View style={{ paddingBottom: 12 }}>
-      <Text
-        style={{
-          color: '#fff',
-          fontWeight: 'bold',
-          fontSize: 22,
-          textAlign: 'center',
-          // React Native text shadow (works on iOS/web; Android uses elevation for views only)
-          textShadowColor: 'rgba(0,231,255,0.5)',
-          textShadowOffset: { width: 0, height: 1 },
-          textShadowRadius: 6,
-        }}
+const HOME_FRAME_WIDTH = 414;
+
+const GradientHeader = ({ title }: { title: string }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const frameWidth = Math.min(windowWidth, HOME_FRAME_WIDTH);
+
+  return (
+    <View style={styles.headerShell}>
+      <LinearGradient
+        colors={["#5421FF", "#6A00FF", "#00E7FF"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.headerFrame, { width: frameWidth }]}
       >
-        {title}
-      </Text>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitleText}>
+            {title}
+          </Text>
+        </View>
+      </LinearGradient>
     </View>
-  </LinearGradient>
-);
+  );
+};
 
 // Mobile frame base dimensions (default iPhone 13). Adjustable via query ?frame=w,h or localStorage 'frameSize'.
 const DEFAULT_BASE_WIDTH = 390;
 const DEFAULT_BASE_HEIGHT = 844;
 
 const WebMobileFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [useMobileFrame, setUseMobileFrame] = useState(false);
   const [scale, setScale] = useState(1);
   const [vw, setVw] = useState(typeof window !== 'undefined' ? window.innerWidth : DEFAULT_BASE_WIDTH);
   const [vh, setVh] = useState(typeof window !== 'undefined' ? window.innerHeight : DEFAULT_BASE_HEIGHT);
@@ -48,10 +52,16 @@ const WebMobileFrame: React.FC<{ children: React.ReactNode }> = ({ children }) =
     const parseFrameSize = () => {
       try {
         const params = new URLSearchParams(window.location.search);
-        const frameParam = params.get('frame'); // e.g. 428,926
+        const frameParamRaw = params.get('frame');
+        const useFrame = !!frameParamRaw;
+        setUseMobileFrame(useFrame);
+        if (!useFrame) {
+          return;
+        }
+        const frameParam = frameParamRaw; // e.g. 1 or 428,926
         let w = DEFAULT_BASE_WIDTH;
         let h = DEFAULT_BASE_HEIGHT;
-        if (frameParam) {
+        if (frameParam && frameParam !== '1') {
           const parts = frameParam.split(',').map(p => parseInt(p.trim(), 10));
           if (parts.length === 2 && parts.every(n => Number.isFinite(n) && n > 200)) {
             w = parts[0]; h = parts[1];
@@ -68,6 +78,10 @@ const WebMobileFrame: React.FC<{ children: React.ReactNode }> = ({ children }) =
     };
 
     const recalc = () => {
+      if (!useMobileFrame) {
+        setScale(1);
+        return;
+      }
       const wWin = window.innerWidth;
       const hWin = window.innerHeight;
       setVw(wWin); setVh(hWin);
@@ -101,15 +115,35 @@ const WebMobileFrame: React.FC<{ children: React.ReactNode }> = ({ children }) =
         setTimeout(recalc, 30);
       }
     };
-    window.addEventListener('keydown', keyHandler);
+    if (useMobileFrame) {
+      window.addEventListener('keydown', keyHandler);
+    }
     return () => {
       window.removeEventListener('resize', recalc);
-      window.removeEventListener('keydown', keyHandler);
+      if (useMobileFrame) {
+        window.removeEventListener('keydown', keyHandler);
+      }
     };
-  }, []);
+  }, [useMobileFrame]);
 
   if (Platform.OS !== 'web') {
     return <>{children}</>; // native platforms unchanged
+  }
+
+  if (!useMobileFrame) {
+    return (
+      <div
+        style={{
+          width: '100vw',
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#f5f7fa',
+        }}
+      >
+        {children}
+      </div>
+    );
   }
 
   // Frame style: center, apply scale transform, preserve aspect
@@ -146,15 +180,46 @@ export default function RootLayout() {
   const StoreBootstrapper: React.FC = () => {
     const dispatch = useDispatch();
     useEffect(() => {
+      let stopStepTracking = () => {};
+      let didCancel = false;
+      const authUnsubscribe = onAuthStateChanged(auth, async () => {
+        try {
+          const [localData, remoteData] = await Promise.all([
+            loadUserState(),
+            loadRemoteUserState(),
+          ]);
+          if (didCancel) return;
+          const mergedUser = mergeHydratedUserState(localData, remoteData);
+          if (Object.keys(mergedUser).length > 0) {
+            dispatch(hydrateUser(mergedUser));
+          }
+        } catch (error) {
+          console.warn('[layout] Failed to hydrate merged user state', error);
+        }
+      });
+
       (async () => {
-        const data = await loadUserState();
-        if (data) dispatch(hydrateUser(data));
+        const [data, remoteData] = await Promise.all([
+          loadUserState(),
+          loadRemoteUserState(),
+        ]);
+        const mergedUser = mergeHydratedUserState(data, remoteData);
+        if (Object.keys(mergedUser).length > 0) dispatch(hydrateUser(mergedUser));
         const awards = await loadAwardsState();
         if (awards?.quests) dispatch(hydrateQuests(awards.quests));
         if (awards?.workouts) dispatch(hydrateWorkouts(awards.workouts));
+        const steps = await loadStepsState();
+        if (steps) dispatch(hydrateSteps(steps));
         // Register background step tracking task (no-op on web)
         try { if (Platform.OS !== 'web') await ensureBackgroundStepTaskRegistered(); } catch {}
+        stopStepTracking = startGlobalStepTracking(dispatch);
       })();
+
+      return () => {
+        didCancel = true;
+        authUnsubscribe();
+        stopStepTracking();
+      };
     }, [dispatch]);
     return null;
   };
@@ -163,6 +228,8 @@ export default function RootLayout() {
     <Provider store={store}>
       <WebMobileFrame>
         <StoreBootstrapper />
+        <LevelUpRewardModal />
+        <BadgeLevelUpModal />
         <Stack
           screenOptions={{
             header: ({ options }) => <GradientHeader title={options.title || ''} />,
@@ -171,16 +238,53 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ title: 'Login' }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="signup" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="Shop" options={{ title: 'Shop' }} />
-          <Stack.Screen name="Avatar" options={{ title: 'Avatar Setup' }} />
+          <Stack.Screen name="Avatar" options={{ headerShown: false }} />
+          <Stack.Screen name="Leaderboard" options={{ headerShown: false }} />
+          <Stack.Screen name="Profile" options={{ headerShown: false }} />
+          <Stack.Screen name="SocialProfile" options={{ headerShown: false }} />
+          <Stack.Screen name="Rest" options={{ headerShown: false }} />
+          <Stack.Screen name="Shop" options={{ headerShown: false }} />
+          <Stack.Screen name="Theme" options={{ headerShown: false }} />
+          <Stack.Screen name="Workout" options={{ headerShown: false }} />
+          <Stack.Screen name="settings" options={{ headerShown: false }} />
+          <Stack.Screen name="outdoor-tracker" options={{ headerShown: false }} />
+          <Stack.Screen name="ai-avatar-demo" options={{ headerShown: false }} />
           <Stack.Screen name="avatar-web" options={{ title: 'Web Avatar' }} />
           <Stack.Screen name="Squat" options={{ title: 'Squat (Legacy)' }} />
-          <Stack.Screen name="Pose" options={{ title: 'Pose' }} />
+          <Stack.Screen name="Pose" options={{ headerShown: false }} />
           <Stack.Screen name="battle-replay" options={{ title: 'Battle Replay' }} />
         </Stack>
       </WebMobileFrame>
     </Provider>
   );
 }
+
+const styles = StyleSheet.create({
+  headerShell: {
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+  },
+  headerFrame: {
+    minHeight: 88,
+    justifyContent: 'flex-end',
+  },
+  headerTitleWrap: {
+    paddingBottom: 12,
+  },
+  headerTitleText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 22,
+    textAlign: 'center',
+    ...(Platform.OS === 'web'
+      ? { textShadow: '0px 1px 6px rgba(0,231,255,0.5)' }
+      : {
+          textShadowColor: 'rgba(0,231,255,0.5)',
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 6,
+        }),
+  },
+});

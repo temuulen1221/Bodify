@@ -4,6 +4,7 @@ const webpack = require('webpack');
 
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
+  const mediapipeTasksVisionRoot = path.resolve(__dirname, 'node_modules', '@mediapipe', 'tasks-vision');
 
   // Global aliases for shims
   config.resolve = config.resolve || {};
@@ -45,14 +46,32 @@ module.exports = async function (env, argv) {
     })
   );
 
-  // Ensure .vrm files are emitted as static assets so require() returns a URL
+  // Ensure 3D asset files are emitted as static assets so require() returns a URL
   config.module = config.module || {};
   config.module.rules = config.module.rules || [];
-  const hasVrmRule = config.module.rules.some(r => r.test && r.test.toString().includes('vrm'));
-  if (!hasVrmRule) {
+  const has3dAssetRule = config.module.rules.some(r => r.test && /vrm|fbx/.test(r.test.toString()));
+  if (!has3dAssetRule) {
     config.module.rules.push({
-      test: /\.vrm$/i,
+      test: /\.(vrm|fbx)$/i,
       type: 'asset/resource'
+    });
+  }
+
+  const hasMediaPipeAssetRule = config.module.rules.some((rule) => {
+    const includeValue = rule && rule.include;
+    return typeof includeValue === 'string' && includeValue.includes('@mediapipe\\tasks-vision');
+  });
+  if (!hasMediaPipeAssetRule) {
+    config.module.rules.push({
+      test: /\.(mjs|js|wasm)$/i,
+      include: [
+        path.join(mediapipeTasksVisionRoot, 'vision_bundle.mjs'),
+        path.join(mediapipeTasksVisionRoot, 'wasm'),
+      ],
+      type: 'asset/resource',
+      generator: {
+        filename: 'static/mediapipe/[name][ext]',
+      },
     });
   }
 

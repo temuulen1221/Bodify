@@ -6,13 +6,27 @@
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import { GLView } from 'expo-gl';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as THREE from 'three';
+import { getMixamoAnimation } from '../CharacterStudio/src/library/loadMixamoAnimation';
 import '../shims/fbjs-performanceNow-shim';
 import '../shims/three-BinaryLoader-shim';
 import '../shims/three-legacy-loaders-shim';
+import { resolveAvatarAnimationConfig } from '../utils/avatarAnimationConfig';
+import { getDefaultAvatarModelId, getLocalAvatarModelModule, resolveAvatarModelSelection } from '../utils/avatarModels';
 import AvatarWeb from './AvatarWeb';
+
+const animationClipCache = new Map();
+
+const resolveActionStartTime = (clip, loop, previousAction) => {
+  const clipDuration = Number(clip?.duration) || 0;
+  if (!previousAction || clipDuration <= 0) return 0;
+  if (loop) {
+    return Math.min(0.08, clipDuration * 0.08);
+  }
+  return Math.min(0.05, clipDuration * 0.06);
+};
 
 // Minimal base64 -> Uint8Array converter (no reliance on global atob)
 const base64ToUint8Array = (base64) => {
@@ -35,27 +49,8 @@ const base64ToUint8Array = (base64) => {
   return new Uint8Array(output);
 };
 
-const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, model, sizeMultiplier = 1.15, xOffset = 0, yOffset = 0, zOffset = 0, alignFootToBottom = false, bottomPadding = 0.05, playAnimation = true }) => {
-  // On web, delegate to the fiber/Canvas-based implementation for better performance & VRM support
-  if (Platform.OS === 'web') {
-    return (
-      <AvatarWeb
-        gender={gender}
-        height={height}
-        weight={weight}
-  /* rotation removed */
-        sizeMultiplier={sizeMultiplier}
-        scaleBoost={1.3}
-        xOffset={xOffset}
-        yOffset={yOffset}
-        zOffset={zOffset}
-        alignFootToBottom={alignFootToBottom}
-        bottomPadding={bottomPadding}
-        modelUrl={model}
-        playAnimation={playAnimation}
-      />
-    );
-  }
+const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, model, sizeMultiplier = 1.15, xOffset = 0, yOffset = 0, zOffset = 0, alignFootToBottom = false, bottomPadding = 0.05, autoFit = true, headMargin = 0.08, bottomInsetPx = 0, focus = 'chest', fitMode = 'shrink', targetFill = 0.94, footLift = 0, preserveTPose = false, playAnimation = true, animationType = 'idle', animationReplayNonce = 0, animationRepeatCount = 1, onAnimationComplete, onVrmLoad, onManagersReady }) => {
+  // === HOOKS MUST BE CALLED FIRST, before any conditionals ===
   const cubeRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
@@ -63,7 +58,11 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
   const modelRef = useRef(null);
   const clockRef = useRef(null);
   const mixerRef = useRef(null);
+  const currentActionRef = useRef(null);
   const animationsRef = useRef([]);
+  const vrmRef = useRef(null);
+  const [modelReady, setModelReady] = useState(false);
+  const [activeAnimationConfig, setActiveAnimationConfig] = useState(() => resolveAvatarAnimationConfig(animationType, gender));
 
   const updateCubeFromProps = useCallback(() => {
     const cube = cubeRef.current;
@@ -255,7 +254,10 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
       try { mixerRef.current.stopAllAction(); } catch (_e) {}
       mixerRef.current = null;
     }
+    currentActionRef.current = null;
     animationsRef.current = [];
+    vrmRef.current = null;
+    setModelReady(false);
     scene?.remove(obj);
     obj.traverse((child) => {
       if (child.isMesh) {
@@ -270,21 +272,119 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
     });
   };
 
+  const playResolvedClip = useCallback((clip, loop = true) => {
+    const targetRoot = vrmRef.current?.scene || modelRef.current;
+    if (!targetRoot || !clip) return;
+
+    try {
+      const mixer = mixerRef.current || new THREE.AnimationMixer(targetRoot);
+      mixerRef.current = mixer;
+      const nextAction = mixer.clipAction(clip);
+      const previousAction = currentActionRef.current;
+
+      nextAction.reset();
+      nextAction.enabled = true;
+      nextAction.setEffectiveTimeScale(1);
+      nextAction.setEffectiveWeight(previousAction && previousAction !== nextAction ? 0 : 1);
+      nextAction.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
+      nextAction.clampWhenFinished = !loop;
+      nextAction.zeroSlopeAtStart = true;
+      nextAction.zeroSlopeAtEnd = true;
+      nextAction.time = resolveActionStartTime(clip, loop, previousAction);
+      try { nextAction.fadeIn(0.2); } catch (_e) {}
+      nextAction.play();
+      if (previousAction && previousAction !== nextAction && nextAction.crossFadeFrom) {
+        try { nextAction.crossFadeFrom(previousAction, 0.2, false); } catch (_e) {}
+      } else if (previousAction && previousAction !== nextAction) {
+        try { previousAction.fadeOut(0.2); } catch (_e) {}
+      }
+      currentActionRef.current = nextAction;
+    } catch (animationError) {
+      console.warn('[Avatar] Failed to play animation clip:', animationError);
+    }
+  }, []);
+
+  const loadAnimationClip = useCallback(async () => {
+    const config = activeAnimationConfig;
+    if (!config.asset) return null;
+
+    const cacheKey = config.id || `${gender}:${config.key}`;
+    if (animationClipCache.has(cacheKey)) return animationClipCache.get(cacheKey);
+
+    const animationAsset = Asset.fromModule(config.asset);
+    await animationAsset.downloadAsync();
+    const animationUri = animationAsset.localUri || animationAsset.uri;
+    if (!animationUri) return null;
+
+    let arrayBuffer;
+    if (animationUri.startsWith('file://')) {
+      const base64 = await FileSystem.readAsStringAsync(animationUri, { encoding: 'base64' });
+      arrayBuffer = base64ToUint8Array(base64).buffer;
+    } else if (animationUri.startsWith('data:')) {
+      const match = animationUri.match(/^data:.*?;base64,(.*)$/);
+      if (!match) return null;
+      arrayBuffer = base64ToUint8Array(match[1]).buffer;
+    } else if (animationUri.startsWith('http')) {
+      const extension = config.format === 'fbx' ? '.fbx' : '.glb';
+      const dest = `${FileSystem.cacheDirectory}avatar-animation-${cacheKey}${extension}`;
+      const info = await FileSystem.getInfoAsync(dest);
+      if (!info.exists) {
+        await FileSystem.downloadAsync(animationUri, dest);
+      }
+      const base64 = await FileSystem.readAsStringAsync(dest, { encoding: 'base64' });
+      arrayBuffer = base64ToUint8Array(base64).buffer;
+    } else {
+      return null;
+    }
+
+    const baseDir = animationUri.replace(/[^/]*$/, '');
+    let sourceAnimations = [];
+    let sourceScene = null;
+
+    if (config.format === 'fbx') {
+      const { FBXLoader } = await import('three/addons/loaders/FBXLoader.js');
+      const loader = new FBXLoader();
+      const parsed = loader.parse(arrayBuffer, baseDir);
+      sourceAnimations = parsed?.animations || [];
+      sourceScene = parsed || null;
+    } else {
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+      const loader = new GLTFLoader();
+      const parsed = await new Promise((resolve, reject) => {
+        loader.parse(arrayBuffer, baseDir, resolve, reject);
+      });
+      sourceAnimations = parsed?.animations || [];
+      sourceScene = parsed?.scene || parsed?.scenes?.[0] || null;
+    }
+
+    let clip = sourceAnimations[0] || null;
+    if (clip && vrmRef.current && sourceScene) {
+      try {
+        clip = getMixamoAnimation(sourceAnimations, sourceScene, vrmRef.current) || clip;
+      } catch (animationError) {
+        console.warn('[Avatar] Failed to retarget external animation clip:', animationError);
+      }
+    }
+
+    const resolved = { clip, loop: config.loop, id: config.id || cacheKey };
+    animationClipCache.set(cacheKey, resolved);
+    return resolved;
+  }, [activeAnimationConfig, gender]);
+
+  useEffect(() => {
+    setActiveAnimationConfig(resolveAvatarAnimationConfig(animationType, gender));
+  }, [animationType, gender]);
+
 
   const loadGLTFModel = useCallback(async (scene) => {
     // Select model asset
-    const fileName = model
-      ? model
-      : gender === 'female'
-        ? 'AvatarSample_F.vrm'
-        : 'AvatarSample_M.vrm';
-    // Static mapping for Metro compatibility
-    const modelMap = {
-      'AvatarSample_F.vrm': require('../assets/models/AvatarSample_F.vrm'),
-      'AvatarSample_M.vrm': require('../assets/models/AvatarSample_M.vrm'),
-      // Add other models as needed
-    };
-    const asset = Asset.fromModule(modelMap[fileName]);
+    const fileName = resolveAvatarModelSelection(model, gender || getDefaultAvatarModelId(gender));
+    const modelModule = getLocalAvatarModelModule(fileName) || getLocalAvatarModelModule(getDefaultAvatarModelId(gender));
+    if (!modelModule) {
+      console.warn('[Avatar] No local model module found for', fileName);
+      return null;
+    }
+    const asset = Asset.fromModule(modelModule);
     await asset.downloadAsync();
     console.log('[Avatar] Asset localUri:', asset.localUri);
     const destPath = `${FileSystem.documentDirectory}${fileName}`;
@@ -482,12 +582,13 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
       });
       // Create VRM from GLTF
       let sceneObj = parsed.scene;
+      let vrmInstance = null;
       const animations = parsed.animations || [];
       // If VRM class available, attempt VRM conversion safely
       if (loader.__enableVRM && loader.__VRMClass && parsed) {
         try {
           console.log('[Avatar] Attempting VRM.from conversion');
-          const vrmInstance = await loader.__VRMClass.from(parsed);
+          vrmInstance = await loader.__VRMClass.from(parsed);
           if (vrmInstance?.scene) {
             sceneObj = vrmInstance.scene;
             console.log('[Avatar] VRM conversion succeeded');
@@ -504,19 +605,19 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
       if (cubeRef.current) cubeRef.current.visible = false;
       scene.add(sceneObj);
       modelRef.current = sceneObj;
+      vrmRef.current = vrmInstance;
       modelRef.current.position.set(0, 0, 0);
       modelRef.current.visible = true;
+      setModelReady(true);
+      if (vrmInstance && typeof onVrmLoad === 'function') {
+        try { onVrmLoad(vrmInstance); } catch (_) {}
+      }
       console.log('Model added:', sceneObj);
 
       if (playAnimation && animationsRef.current.length > 0) {
         try {
-          const mixer = new THREE.AnimationMixer(sceneObj);
-          mixerRef.current = mixer;
           const clip = animationsRef.current.find((c) => c.name?.toLowerCase().includes('idle')) || animationsRef.current[0];
-          const action = mixer.clipAction(clip);
-          action.loop = THREE.LoopRepeat;
-          action.clampWhenFinished = false;
-          action.play();
+          playResolvedClip(clip, true);
         } catch (_e) { /* noop */ }
       }
       centerAndFitModel(sceneObj, scene, cameraRef.current);
@@ -531,30 +632,34 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
       if (originalCreateImageBitmap) global.createImageBitmap = originalCreateImageBitmap;
       if (originalFileReader) global.FileReader = originalFileReader;
     }
-  }, [gender, model, updateModelFromProps, playAnimation]);
+  }, [gender, model, onVrmLoad, playAnimation, playResolvedClip, updateModelFromProps]);
 
   // Respond to playAnimation toggles by starting/stopping mixer
   useEffect(() => {
-    if (!modelRef.current) return;
-    if (playAnimation) {
-      if (!mixerRef.current && animationsRef.current && animationsRef.current.length > 0) {
-        try {
-          const mixer = new THREE.AnimationMixer(modelRef.current);
-          mixerRef.current = mixer;
-          const clip = animationsRef.current.find((c) => c.name?.toLowerCase().includes('idle')) || animationsRef.current[0];
-          const action = mixer.clipAction(clip);
-          action.loop = THREE.LoopRepeat;
-          action.clampWhenFinished = false;
-          action.play();
-        } catch (_e) { /* noop */ }
-      }
-    } else {
+    if (!modelRef.current || !modelReady) return;
+    if (!playAnimation) {
       if (mixerRef.current) {
         try { mixerRef.current.stopAllAction(); } catch (_e) {}
         mixerRef.current = null;
       }
+      currentActionRef.current = null;
+      return;
     }
-  }, [playAnimation]);
+
+    let cancelled = false;
+    loadAnimationClip()
+      .then((resolved) => {
+        if (cancelled || !resolved?.clip) return;
+        playResolvedClip(resolved.clip, resolved.loop);
+      })
+      .catch((animationError) => {
+        console.warn('[Avatar] External animation load failed:', animationError);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAnimationConfig.id, animationReplayNonce, loadAnimationClip, modelReady, playAnimation, playResolvedClip]);
 
   useEffect(() => {
     const applyTextureToObject = (obj, texture) => {
@@ -648,6 +753,40 @@ const Avatar = ({ height = '175', weight = '70', gender = 'male', photoUri, mode
       if (rendererRef.current) rendererRef.current.dispose();
     };
   }, []);
+
+  // On web, delegate to the fiber/Canvas-based implementation for better performance & VRM support
+  if (Platform.OS === 'web') {
+    return (
+      <AvatarWeb
+        gender={gender}
+        height={height}
+        weight={weight}
+        sizeMultiplier={sizeMultiplier}
+        scaleBoost={1.08}
+        xOffset={xOffset}
+        yOffset={yOffset}
+        zOffset={zOffset}
+        alignFootToBottom={alignFootToBottom}
+        bottomPadding={bottomPadding}
+        autoFit={autoFit}
+        headMargin={headMargin}
+        bottomInsetPx={bottomInsetPx}
+        focus={focus}
+        fitMode={fitMode}
+        targetFill={targetFill}
+        footLift={footLift}
+        preserveTPose={preserveTPose}
+        animationType={animationType}
+        animationReplayNonce={animationReplayNonce}
+        animationRepeatCount={animationRepeatCount}
+        onAnimationComplete={onAnimationComplete}
+        modelUrl={model}
+        playAnimation={playAnimation}
+        onVrmLoad={onVrmLoad}
+        onManagersReady={onManagersReady}
+      />
+    );
+  }
 
   return <GLView style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }} onContextCreate={onContextCreate} />;
 };
