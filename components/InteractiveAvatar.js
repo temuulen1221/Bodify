@@ -1,9 +1,10 @@
 import { Asset } from 'expo-asset';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import { LipSync } from '../CharacterStudio/src/library/lipsync';
+import { useAvatarGestures } from '../hooks/useAvatarGestures';
 import { AVATAR_ANIMATIONS, getAvatarAnimationDuration, resolveAvatarAnimationConfig } from '../utils/avatarAnimationConfig';
 import { buildWorkoutDemoSequence, inferWorkoutAnimationFromText } from '../utils/avatarWorkoutHelpers';
 import Avatar from './avatar';
@@ -27,15 +28,6 @@ const CONVERSATION_STATES = {
   THINKING: 'thinking',
   SPEAKING: 'speaking',
 };
-
-const RESPONSES = [
-  { gesture: 'tap', animation: ANIMATIONS.HAPPY, sound: 'tap.mp3', text: 'Hey there!' },
-  { gesture: 'doubleTap', animation: ANIMATIONS.LAUGH, sound: 'laugh.mp3', text: 'That tickles!' },
-  { gesture: 'swipeLeft', animation: ANIMATIONS.WAVE, sound: 'wave.mp3', text: 'See you later!' },
-  { gesture: 'swipeRight', animation: ANIMATIONS.DANCE, sound: 'dance.mp3', text: 'Let\'s dance!' },
-  { gesture: 'longPress', animation: ANIMATIONS.SURPRISED, sound: 'surprised.mp3', text: 'Oh!' },
-  { gesture: 'pinch', animation: ANIMATIONS.TALK, sound: 'talk.mp3', text: 'Whoa, that\'s tight!' },
-];
 
 const TTS_ENDPOINT = process.env.EXPO_PUBLIC_TTS_ENDPOINT || '';
 const TTS_API_KEY = process.env.EXPO_PUBLIC_TTS_API_KEY || '';
@@ -1113,84 +1105,8 @@ const InteractiveAvatar = forwardRef(({
     setCameraShot,
   }), [speak, setVoiceType, getVoiceType, setConversationState, triggerAnimation, triggerAnimationSequence, triggerWorkoutDemo, stopAnimationPlayback, initializeLipSync, startMicLipSync, stopMicLipSync, setEmotion, setCameraShot]);
 
-  // Handle tap gesture
-  const handleTap = useCallback(() => {
-    const response = RESPONSES.find(r => r.gesture === 'tap');
-    if (response) {
-      playSound(response.sound);
-      speak(response.text);
-      triggerAnimation(response.animation);
-      onInteraction?.({ type: 'tap', animation: response.animation, text: response.text });
-    }
-  }, [playSound, speak, triggerAnimation, onInteraction]);
-
-  // Handle double tap
-  const handleDoubleTap = useCallback(() => {
-    const response = RESPONSES.find(r => r.gesture === 'doubleTap');
-    if (response) {
-      playSound(response.sound);
-      speak(response.text);
-      triggerAnimation(response.animation);
-      onInteraction?.({ type: 'doubleTap', animation: response.animation, text: response.text });
-    }
-  }, [playSound, speak, triggerAnimation, onInteraction]);
-
-  // Handle swipe left
-  const handleSwipeLeft = useCallback(() => {
-    const response = RESPONSES.find(r => r.gesture === 'swipeLeft');
-    if (response) {
-      playSound(response.sound);
-      speak(response.text);
-      triggerAnimation(response.animation);
-      onInteraction?.({ type: 'swipeLeft', animation: response.animation, text: response.text });
-    }
-  }, [playSound, speak, triggerAnimation, onInteraction]);
-
-  // Handle swipe right
-  const handleSwipeRight = useCallback(() => {
-    const response = RESPONSES.find(r => r.gesture === 'swipeRight');
-    if (response) {
-      playSound(response.sound);
-      speak(response.text);
-      triggerAnimation(response.animation);
-      onInteraction?.({ type: 'swipeRight', animation: response.animation, text: response.text });
-    }
-  }, [playSound, speak, triggerAnimation, onInteraction]);
-
-  // Handle long press
-  const handleLongPress = useCallback(() => {
-    const response = RESPONSES.find(r => r.gesture === 'longPress');
-    if (response) {
-      playSound(response.sound);
-      speak(response.text);
-      triggerAnimation(response.animation);
-      onInteraction?.({ type: 'longPress', animation: response.animation, text: response.text });
-    }
-  }, [playSound, speak, triggerAnimation, onInteraction]);
-
-  // Setup gesture handlers
-  const tapGesture = Gesture.Tap().runOnJS(true).onStart(handleTap);
-  const doubleTapGesture = Gesture.Tap().numberOfTaps(2).runOnJS(true).onStart(handleDoubleTap);
-  
-  // Pan gesture for swipe detection (left/right) - detect on end only
-  const panGesture = Gesture.Pan()
-    .runOnJS(true)
-    .onEnd((e) => {
-      if (e.translationX < -50) {
-        handleSwipeLeft(); // Swipe left
-      } else if (e.translationX > 50) {
-        handleSwipeRight(); // Swipe right
-      }
-    });
-  
-  const longPressGesture = Gesture.LongPress().minDuration(500).runOnJS(true).onStart(handleLongPress);
-
-  const gestures = Gesture.Simultaneous(
-    doubleTapGesture,
-    tapGesture,
-    panGesture,
-    longPressGesture
-  );
+  // Gesture handlers (tap, double-tap, swipe, long-press)
+  const { gestures } = useAvatarGestures({ playSound, speak, triggerAnimation, onInteraction });
 
   // Voice detection setup (mobile)
   useEffect(() => {

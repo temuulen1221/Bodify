@@ -75,8 +75,8 @@ const EDITOR_TABS = [
 const Home = () => {
 	const route = useRoute();
 	const navigation = useNavigation();
-	const persistedUser = useSelector((state) => state.user || {});
-	const userData = route.params?.userData || persistedUser;
+	const persistedUser = useSelector((state: any) => state.user || {});
+	const userData = (route.params as any)?.userData || persistedUser;
 	const avatarHeight = String(persistedUser.height || userData.height || '175');
 	const avatarWeight = String(persistedUser.weight || userData.weight || '70');
 	const [gender, setGender] = useState(String(userData.gender || 'male'));
@@ -89,9 +89,9 @@ const Home = () => {
 	const [hatStyle, setHatStyle] = useState(String(userData.hatStyle || 'none'));
 	const [activeTab, setActiveTab] = useState('body');
 	const dispatch = useDispatch();
-	const [pendingPhoto, setPendingPhoto] = useState(null);
-	const [usedPhoto, setUsedPhoto] = useState(null);
-	const cameraRef = useRef(null);
+	const [pendingPhoto, setPendingPhoto] = useState<string | null>(null);
+	const [usedPhoto, setUsedPhoto] = useState<string | null>(null);
+	const cameraRef = useRef<any>(null);
 	const [savedToast, setSavedToast] = useState(false);
 	const insets = useSafeAreaInsets();
 	const selectedModelOption = useMemo(
@@ -129,7 +129,7 @@ const Home = () => {
 
 		const handleSave = async () => {
 			const profileUpdate = { gender, photoUri: usedPhoto, avatarModel, hairstyle, eyeColor, skinTone, clothingStyle, accessoryStyle, hatStyle };
-			dispatch(setProfile(profileUpdate));
+			dispatch((setProfile as any)(profileUpdate));
 
 			const currentUser = auth.currentUser;
 			if (currentUser?.uid) {
@@ -155,11 +155,11 @@ const Home = () => {
 		};
 
 	return (
-		<LinearGradient colors={GRADIENTS.futuristic} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
+		<LinearGradient colors={GRADIENTS.futuristic as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
 			<View style={styles.header}>
 				<BackButton />
 				<Text style={styles.greeting}>Hello, User!</Text>
-				<TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
+					<TouchableOpacity style={styles.profileBtn} onPress={() => (navigation as any).navigate('Profile')}>
 					<Ionicons name="person-circle-outline" size={36} color="#4F8EF7" />
 				</TouchableOpacity>
 			</View>
@@ -209,7 +209,7 @@ const Home = () => {
 						<View style={styles.stageContentRow}>
 							<View style={styles.avatarContainer}>
 								<View style={styles.avatarPreviewWrap}>
-									<InteractiveAvatar model={avatarModel} height={avatarHeight} weight={avatarWeight} gender={gender} photoUri={usedPhoto} enableVoice={false} enableTTS={false} preserveTPose={true} playAnimation={false} sizeMultiplier={0.98} yOffset={-0.04} alignFootToBottom={true} bottomPadding={0.02} headMargin={0.16} focus="full" fitMode="shrink" targetFill={0.88} />
+									<InteractiveAvatar {...{ model: avatarModel, height: avatarHeight, weight: avatarWeight, gender, photoUri: usedPhoto, enableVoice: false, enableTTS: false, preserveTPose: true, playAnimation: false, sizeMultiplier: 0.98, yOffset: -0.04, alignFootToBottom: true, bottomPadding: 0.02, headMargin: 0.16, focus: 'full', fitMode: 'shrink', targetFill: 0.88 } as any} />
 								</View>
 							</View>
 							<View style={styles.editorRail}>
@@ -217,7 +217,7 @@ const Home = () => {
 									const selected = activeTab === tab.id;
 									return (
 										<TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} activeOpacity={0.86} style={[styles.railButton, selected && styles.railButtonSelected]}>
-											<Ionicons name={tab.icon} size={20} color={selected ? '#fff' : 'rgba(255,255,255,0.72)'} />
+											<Ionicons name={tab.icon as any} size={20} color={selected ? '#fff' : 'rgba(255,255,255,0.72)'} />
 											<Text style={[styles.railButtonText, selected && styles.railButtonTextSelected]}>{tab.label}</Text>
 										</TouchableOpacity>
 									);
@@ -281,7 +281,7 @@ const Home = () => {
 											const selected = eyeColor === option.id;
 											return (
 												<TouchableOpacity key={option.id} onPress={() => setEyeColor(option.id)} style={[styles.swatchCard, selected && styles.swatchCardSelected]}>
-													<View style={[styles.swatchDot, styles[`swatchDot_${option.id}`]]} />
+													<View style={[styles.swatchDot, (styles as any)[`swatchDot_${option.id}`]]} />
 													<Text style={[styles.swatchLabel, selected && styles.swatchLabelSelected]}>{option.label}</Text>
 												</TouchableOpacity>
 											);
@@ -295,7 +295,7 @@ const Home = () => {
 											const selected = skinTone === option.id;
 											return (
 												<TouchableOpacity key={option.id} onPress={() => setSkinTone(option.id)} style={[styles.swatchCard, selected && styles.swatchCardSelected]}>
-													<View style={[styles.skinToneChip, styles[`skinTone_${option.id}`]]} />
+													<View style={[styles.skinToneChip, (styles as any)[`skinTone_${option.id}`]]} />
 													<Text style={[styles.swatchLabel, selected && styles.swatchLabelSelected]}>{option.label}</Text>
 												</TouchableOpacity>
 											);
@@ -927,6 +927,6 @@ const styles = StyleSheet.create({
 		pointerEvents: 'none',
 	},
 	toastText: { color: '#fff', fontWeight: '700' },
-});
+}) as unknown as Record<string, any>;
 
 export default Home;

@@ -18,13 +18,13 @@ function AchievementsScreen() {
   const dispatch = useDispatch();
   const detailAnim = useRef(new Animated.Value(0)).current;
   const detailSwipeX = useRef(new Animated.Value(0)).current;
-  const user = useSelector((s) => s.user || {});
+  const user = useSelector((s: any) => s.user || {});
   const selectedBadgeKey = user?.selectedBadgeKey || null;
-  const stepsByDate = useSelector((s) => s.steps?.stepsByDate || {});
-  const sessionsByDate = useSelector((s) => s.workouts?.sessionsByDate || {});
+  const stepsByDate = useSelector((s: any) => s.steps?.stepsByDate || {});
+  const sessionsByDate = useSelector((s: any) => s.workouts?.sessionsByDate || {});
   const { width: windowWidth } = useWindowDimensions();
   const layoutWidth = Platform.OS === 'web' ? Math.min(windowWidth, WEB_FRAME_WIDTH) : windowWidth;
-  const [detailBadgeKey, setDetailBadgeKey] = useState(null);
+  const [detailBadgeKey, setDetailBadgeKey] = useState<string | null>(null);
 
   const todayKey = useMemo(() => {
     const d = new Date();
@@ -73,7 +73,7 @@ function AchievementsScreen() {
   const recentRewards = Array.isArray(user?.recentRewards) ? user.recentRewards.slice(0, 4) : [];
   const levelProgressPct = Math.max(0, Math.min(100, Math.round((points / pointsMax) * 100)));
 
-  const formatRewardTimestamp = (value) => {
+  const formatRewardTimestamp = (value: any) => {
     const timestamp = Number(value || 0);
     if (!timestamp) return 'Recently';
     const diffMs = Date.now() - timestamp;
@@ -85,7 +85,7 @@ function AchievementsScreen() {
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays}d ago`;
   };
-  const showBadgeDetails = (badgeKey) => {
+  const showBadgeDetails = (badgeKey: any) => {
     const nextIndex = badgeConfigs.findIndex((badge) => badge.key === badgeKey);
     const direction = nextIndex > detailBadgeIndex ? 1 : nextIndex < detailBadgeIndex ? -1 : 0;
 
@@ -120,7 +120,7 @@ function AchievementsScreen() {
     });
   };
 
-  const cycleBadgeDetails = (offset) => {
+  const cycleBadgeDetails = (offset: any) => {
     const nextIndex = (detailBadgeIndex + offset + badgeConfigs.length) % badgeConfigs.length;
     showBadgeDetails(badgeConfigs[nextIndex].key);
   };
@@ -222,7 +222,7 @@ function AchievementsScreen() {
               <Text style={styles.rewardFeedTitle}>Recent Awards</Text>
               <Text style={styles.rewardFeedSubtitle}>Workouts, quests, streaks, and level-ups now feed one reward timeline.</Text>
             </View>
-            {recentRewards.length ? recentRewards.map((reward) => (
+            {recentRewards.length ? recentRewards.map((reward: any) => (
               <View key={reward.id} style={styles.rewardRow}>
                 <View style={styles.rewardIconWrap}>
                   <Icon
@@ -306,7 +306,7 @@ function AchievementsScreen() {
             ]}
           >
             <FitnessBadgeCard
-              {...detailBadge.detailProps}
+              {...detailBadge.detailProps as any}
               containerStyle={styles.badgeCard}
               compact={isCompactMobile}
             />

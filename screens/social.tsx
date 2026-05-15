@@ -66,7 +66,7 @@ const seedPosts = [
 
 const SOCIAL_COLLECTION = 'socialPosts';
 
-const getRelativeTimeLabel = (value) => {
+const getRelativeTimeLabel = (value: any) => {
   if (!value) return 'Just now';
   const timestamp = value?.toDate ? value.toDate() : new Date(value);
   if (Number.isNaN(timestamp.getTime())) return 'Just now';
@@ -80,7 +80,7 @@ const getRelativeTimeLabel = (value) => {
   return `${days}d ago`;
 };
 
-const normalizeFeedPost = (post) => ({
+const normalizeFeedPost = (post: any) => ({
   ...post,
   replies: Array.isArray(post.replies) ? post.replies : [],
   imageUri: post.imageUri || '',
@@ -89,7 +89,7 @@ const normalizeFeedPost = (post) => ({
   isSeed: Boolean(post.isSeed),
 });
 
-const normalizeSocialPost = (docSnap) => {
+const normalizeSocialPost = (docSnap: any) => {
   const data = docSnap.data() || {};
   return normalizeFeedPost({
     id: docSnap.id,
@@ -109,7 +109,7 @@ const normalizeSocialPost = (docSnap) => {
   });
 };
 
-function SocialComposer({ value, imageUri, onChangeText, onQuickPick, onAttachPhoto, onClearPhoto, onPost }) {
+function SocialComposer({ value, imageUri, onChangeText, onQuickPick, onAttachPhoto, onClearPhoto, onPost }: { value: any; imageUri: any; onChangeText: any; onQuickPick: any; onAttachPhoto: any; onClearPhoto: any; onPost: any }) {
   return (
     <LinearGradient colors={['rgba(10,18,34,0.96)', 'rgba(20,26,44,0.98)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.composerCard}>
       <View style={styles.composerHeader}>
@@ -174,7 +174,7 @@ function SocialComposer({ value, imageUri, onChangeText, onQuickPick, onAttachPh
   );
 }
 
-function SocialPost({ post, onLike, onComment }) {
+function SocialPost({ post, onLike, onComment }: { post: any; onLike: any; onComment: any }) {
   return (
     <LinearGradient colors={['rgba(12,16,28,0.94)', 'rgba(18,25,41,0.98)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.postCard}>
       <View style={styles.postTopRow}>
@@ -223,7 +223,7 @@ function SocialPost({ post, onLike, onComment }) {
       </View>
 
       <View style={styles.replyStrip}>
-        {post.replies.slice(0, 2).map((reply) => (
+        {post.replies.slice(0, 2).map((reply: any) => (
           <View key={reply} style={styles.replyBubble}>
             <Text style={styles.replyBubbleText}>{reply}</Text>
           </View>
@@ -235,17 +235,17 @@ function SocialPost({ post, onLike, onComment }) {
 
 export default function SocialScreen() {
   const router = useRouter();
-  const user = useSelector((state) => state.user || {});
-  const activeBadgeKey = useSelector((state) => state.user?.selectedBadgeKey || null);
+  const user = useSelector((state: any) => state.user || {});
+  const activeBadgeKey = useSelector((state: any) => state.user?.selectedBadgeKey || null);
   const avatarName = user?.avatarName || 'Player';
   const level = user?.level || 1;
-  const stepsByDate = useSelector((state) => state.steps?.stepsByDate || {});
-  const sessionsByDate = useSelector((state) => state.workouts?.sessionsByDate || {});
+  const stepsByDate = useSelector((state: any) => state.steps?.stepsByDate || {});
+  const sessionsByDate = useSelector((state: any) => state.workouts?.sessionsByDate || {});
   const [selectedFilter, setSelectedFilter] = useState('For you');
   const [searchQuery, setSearchQuery] = useState('');
   const [composerValue, setComposerValue] = useState('Finished my workout and feel good about the consistency this week.');
   const [composerImageUri, setComposerImageUri] = useState('');
-  const [remotePosts, setRemotePosts] = useState([]);
+  const [remotePosts, setRemotePosts] = useState<any[]>([]);
   const [feedReady, setFeedReady] = useState(true);
 
   useEffect(() => {
@@ -277,11 +277,11 @@ export default function SocialScreen() {
   const { badgeConfigs } = useMemo(() => buildBadgeData({ user, stepsByDate, sessionsByDate }), [user, stepsByDate, sessionsByDate]);
   const previewBadge = getActiveBadgeConfig(badgeConfigs, activeBadgeKey) || badgeConfigs[0];
   const previewBadgeTheme = {
-    tone: compactBadgePalette[previewBadge.tone]?.color || compactBadgePalette.cyan.color,
-    border: `${(compactBadgePalette[previewBadge.tone] || compactBadgePalette.cyan).color}26`,
-    panel: `${(compactBadgePalette[previewBadge.tone] || compactBadgePalette.cyan).color}10`,
-    soft: `${(compactBadgePalette[previewBadge.tone] || compactBadgePalette.cyan).color}18`,
-    text: `${(compactBadgePalette[previewBadge.tone] || compactBadgePalette.cyan).color}F0`,
+    tone: (compactBadgePalette as any)[previewBadge.tone]?.color || compactBadgePalette.cyan.color,
+    border: `${((compactBadgePalette as any)[previewBadge.tone] || compactBadgePalette.cyan).color}26`,
+    panel: `${((compactBadgePalette as any)[previewBadge.tone] || compactBadgePalette.cyan).color}10`,
+    soft: `${((compactBadgePalette as any)[previewBadge.tone] || compactBadgePalette.cyan).color}18`,
+    text: `${((compactBadgePalette as any)[previewBadge.tone] || compactBadgePalette.cyan).color}F0`,
   };
 
   const openPhotoPicker = async () => {
@@ -319,7 +319,7 @@ export default function SocialScreen() {
     }
   };
 
-  const uploadComposerImage = async (uri) => {
+  const uploadComposerImage = async (uri: any) => {
     if (!uri) return '';
     const imageRef = storageRef(storage, `socialPosts/${auth.currentUser?.uid || 'guest'}/${Date.now()}.jpg`);
 
@@ -382,15 +382,15 @@ export default function SocialScreen() {
     })();
   };
 
-  const handleLike = (postId) => {
-    const target = remotePosts.find((post) => post.id === postId);
+  const handleLike = (postId: any) => {
+    const target = remotePosts.find((post: any) => post.id === postId);
     if (!target || target.isSeed) return;
     updateDoc(doc(db, SOCIAL_COLLECTION, postId), { likes: Number(target.likes || 0) + 1 })
       .catch((error) => console.warn('[Social] like update failed', error));
   };
 
-  const handleComment = (postId) => {
-    const target = remotePosts.find((post) => post.id === postId);
+  const handleComment = (postId: any) => {
+    const target = remotePosts.find((post: any) => post.id === postId);
     if (!target || target.isSeed) return;
     updateDoc(doc(db, SOCIAL_COLLECTION, postId), {
       comments: Number(target.comments || 0) + 1,
@@ -903,5 +903,28 @@ const styles = StyleSheet.create({
     color: 'rgba(232,249,255,0.76)',
     fontSize: 9,
     lineHeight: 13,
+  },
+  headerBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#00E7FF',
+  },
+  searchRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
   },
 });

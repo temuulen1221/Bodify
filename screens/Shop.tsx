@@ -30,17 +30,17 @@ const SUB_CATEGORIES = {
 };
 
 export default function Shop() {
-  const energy = useSelector((s) => s.user?.energy ?? 0);
-  const discountTickets = useSelector((s) => s.user?.discountTickets ?? 0);
-  const streakShields = useSelector((s) => s.user?.streakShields ?? 0);
-  const ownedShopItems = useSelector((s) => s.user?.ownedShopItems ?? []);
+  const energy = useSelector((s: any) => s.user?.energy ?? 0);
+  const discountTickets = useSelector((s: any) => s.user?.discountTickets ?? 0);
+  const streakShields = useSelector((s: any) => s.user?.streakShields ?? 0);
+  const ownedShopItems = useSelector((s: any) => s.user?.ownedShopItems ?? []);
   const dispatch = useDispatch();
   const [mainCat, setMainCat] = useState('Avatar');
   const [subCat, setSubCat] = useState(SUB_CATEGORIES['Avatar'][0]);
-  const [ticketItemId, setTicketItemId] = useState(null);
+  const [ticketItemId, setTicketItemId] = useState<string | null>(null);
 
-  const isOwned = (itemId) => Array.isArray(ownedShopItems) && ownedShopItems.includes(itemId);
-  const getItemPrice = (item) => {
+  const isOwned = (itemId: any) => Array.isArray(ownedShopItems) && ownedShopItems.includes(itemId);
+  const getItemPrice = (item: any) => {
     const basePrice = Math.max(0, Number(item?.price) || 0);
     if (ticketItemId === item?.id && discountTickets > 0) {
       return Math.max(1, Math.floor(basePrice * 0.75));
@@ -48,7 +48,7 @@ export default function Shop() {
     return basePrice;
   };
 
-  const handleBuy = (item) => {
+  const handleBuy = (item: any) => {
     if (isOwned(item.id)) {
       Alert.alert('Already owned', `${item.name} is already unlocked.`);
       return;
@@ -93,10 +93,10 @@ export default function Shop() {
         {MAIN_CATEGORIES.map((cat) => (
           <TouchableOpacity
             key={cat}
-            style={[styles.tabBtn, mainCat === cat && styles.tabBtnActive]}
+            style={[styles.tabBtn, mainCat === cat && (styles as any).tabBtnActive]}
             onPress={() => {
               setMainCat(cat);
-              setSubCat(SUB_CATEGORIES[cat][0]);
+              setSubCat((SUB_CATEGORIES as any)[cat][0]);
             }}
           >
             <Text style={[styles.tabBtnText, mainCat === cat && styles.tabBtnTextActive]}>{cat}</Text>
@@ -105,7 +105,7 @@ export default function Shop() {
       </View>
       {/* Subcategory dropdown */}
       <View style={styles.subBar}>
-        {SUB_CATEGORIES[mainCat].map((sub) => (
+        {(SUB_CATEGORIES as any)[mainCat].map((sub: any) => (
           <TouchableOpacity
             key={sub}
             style={[styles.subBtn, subCat === sub && styles.subBtnActive]}

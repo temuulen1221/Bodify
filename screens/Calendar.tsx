@@ -8,7 +8,7 @@ import { addWorkoutSession } from '../store';
 
 const HOME_FRAME_WIDTH = 414;
 
-const getSessionTypeIconName = (type) => {
+const getSessionTypeIconName = (type: any) => {
   const normalizedType = String(type || '').toLowerCase();
   if (normalizedType.includes('strength')) return 'barbell';
   if (normalizedType.includes('run')) return 'walk';
@@ -20,13 +20,13 @@ const getSessionTypeIconName = (type) => {
 
 // Simple calendar month view with stars on completed days
 export default function CalendarScreen() {
-  const completions = useSelector((s) => s.quests?.dailyCompletion || {});
-  const sessionsByDate = useSelector((s) => s.workouts?.sessionsByDate || {});
-  const stepsByDate = useSelector((s) => s.steps?.stepsByDate || {});
+  const completions = useSelector((s: any) => s.quests?.dailyCompletion || {});
+  const sessionsByDate = useSelector((s: any) => s.workouts?.sessionsByDate || {});
+  const stepsByDate = useSelector((s: any) => s.steps?.stepsByDate || {});
   const dispatch = useDispatch();
   const today = new Date();
   const [monthOffset, setMonthOffset] = useState(0);
-  const [selectedDate, setSelectedDate] = useState(null); // 'YYYY-MM-DD'
+  const [selectedDate, setSelectedDate] = useState<string | null>(null); // 'YYYY-MM-DD'
   const { width: winW } = useWindowDimensions();
   const frameWidth = Math.min(winW, HOME_FRAME_WIDTH);
   const maxGridWidth = Math.min(560, Math.max(320, Math.floor(frameWidth - 32))); // leave side padding
@@ -51,9 +51,9 @@ export default function CalendarScreen() {
   // Title-only add activity modal state
   const [addVisible, setAddVisible] = useState(false);
   const [addTitle, setAddTitle] = useState('');
-  const [addDateTarget, setAddDateTarget] = useState(null);
+  const [addDateTarget, setAddDateTarget] = useState<string | null>(null);
 
-  const openAdd = (dateStr) => {
+  const openAdd = (dateStr: string | null = null) => {
     setAddDateTarget(dateStr || todayStr);
     setAddTitle('');
     setAddVisible(true);
@@ -70,7 +70,7 @@ export default function CalendarScreen() {
   for (let i = 0; i < firstDayOfWeek; i++) grid.push(null);
   for (let day = 1; day <= daysInMonth; day++) grid.push(day);
 
-  const fmt = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const fmt = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
   return (
     <View style={styles.container}>
@@ -194,7 +194,7 @@ export default function CalendarScreen() {
               style={styles.detailsInner}
             >
               <View style={styles.detailsHeader}>
-                <Ionicons name={headerIcon} size={18} color="#9feaff" />
+                <Ionicons name={headerIcon as any} size={18} color="#9feaff" />
                 <Text style={styles.detailsTitle}>{headerTitle}</Text>
                 <TouchableOpacity onPress={() => openAdd(panelKey)} style={styles.actionBtn} activeOpacity={0.9}>
                   <LinearGradient colors={["#00eaff", "#7a5cff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionBtnGrad}>
@@ -225,7 +225,7 @@ export default function CalendarScreen() {
                 <ScrollView style={{ maxHeight: maxH }} contentContainerStyle={{ paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
                   {sessions.map((s, idx) => (
                     <View key={s.id || idx} style={styles.workoutItem}>
-                      <Ionicons name={getSessionTypeIconName(s.type)} size={18} color="#00eaff" />
+                      <Ionicons name={getSessionTypeIconName(s.type) as any} size={18} color="#00eaff" />
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.workoutTitle}>{s.title || 'Workout'}</Text>
                         <Text style={styles.workoutMeta}>{`${s.durationMin ?? 0} min \u00b7 ${s.calories ?? 0} kcal \u00b7 ${s.awardedXP ?? 0} XP`}</Text>
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   starWrap: { position: 'absolute', bottom: 6, right: 6 },
   starIcon: {
     ...(Platform.OS === 'web'
-      ? { textShadow: '0px 0px 6px rgba(0,234,255,0.8)' }
+      ? { textShadow: '0px 0px 6px rgba(0,234,255,0.8)' } as any
       : {
           textShadowColor: 'rgba(0,234,255,0.8)',
           textShadowRadius: 6,
@@ -459,4 +459,4 @@ const styles = StyleSheet.create({
   modalBtnOutlineText: { color: '#cfe6ff', fontWeight: '800' },
   modalBtnGrad: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   modalBtnText: { color: '#fff', fontWeight: '900' },
-});
+}) as unknown as Record<string, any>;

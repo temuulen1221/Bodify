@@ -3,6 +3,7 @@ import { type ComponentType, useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BackButton from '../components/BackButton';
+import ErrorBoundary from '../components/ErrorBoundary';
 import InteractiveAvatar from '../components/InteractiveAvatar';
 import { BattleEvent, BattleParticipantInput, BattleResult, buildParticipantFromWorkout, generateBattleScript, mockBattleExample } from '../utils/battleScript';
 import { fallbackFriends, fetchFriendsForBattle } from '../utils/friendsData';
@@ -262,6 +263,7 @@ const BattleReplay = () => {
           >
             <View style={styles.avatarSide}>
               <View style={styles.avatarFrame}>
+                <ErrorBoundary fallbackMessage="Avatar unavailable">
                 <InteractiveAvatarComponent
                   gender="male"
                   sizeMultiplier={1.05}
@@ -272,6 +274,7 @@ const BattleReplay = () => {
                   model={null}
                   photoUri={null}
                 />
+                </ErrorBoundary>
               </View>
               <Text style={styles.sideLabel}>{user.name}</Text>
             </View>
@@ -280,6 +283,7 @@ const BattleReplay = () => {
             </View>
             <View style={styles.avatarSide}>
               <View style={styles.avatarFrame}>
+                <ErrorBoundary fallbackMessage="Avatar unavailable">
                 <InteractiveAvatarComponent
                   gender="female"
                   sizeMultiplier={1.05}
@@ -290,6 +294,7 @@ const BattleReplay = () => {
                   model={null}
                   photoUri={null}
                 />
+                </ErrorBoundary>
               </View>
               <Text style={styles.sideLabel}>{rival.name}</Text>
             </View>

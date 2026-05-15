@@ -7,162 +7,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../components/BackButton';
+import ErrorBoundary from '../components/ErrorBoundary';
 import InteractiveAvatar from '../components/InteractiveAvatar';
 import ScreenFrame from '../components/ScreenFrame';
 import { acceptPrivacy, addBadgeXP, addWeeklySquatReps, addWorkoutSession, addXP, incrementPoseRep, markWeeklyXPAwarded, resetPoseSession, setFormFeedback, setPoseExercise } from '../store';
-import { AVATAR_ANIMATIONS, getAvatarAnimationDuration, resolveAvatarAnimationConfig } from '../utils/avatarAnimationConfig';
+import { AVATAR_ANIMATIONS } from '../utils/avatarAnimationConfig';
 import { resolveAvatarModelSelection } from '../utils/avatarModels';
 import { getPoseExerciseDefinition, getPoseExerciseForAnimation, getPoseExerciseMetricLabel, isHoldBasedPoseExercise, POSE_EXERCISE_OPTIONS } from '../utils/poseExerciseConfig';
+import {
+    buildStablePosePreviewDemo,
+    FEEDBACK_COOLDOWN_MS,
+    formatTimerLabel,
+    HOLD_MILESTONES,
+    MILESTONE_COOLDOWN_MS,
+    MOTIVATION_COOLDOWN_MS,
+    MOTIVATION_LINES,
+    normalizePlanExercise,
+    REP_MILESTONES,
+    resolveAiPlanRaw
+} from '../utils/poseScreenUtils';
 import { createWorkoutSessionRecord } from '../utils/workoutSessionXP';
 
 const { POSE_DETECTOR_HTML } = Platform.OS === 'web'
   ? require('../utils/poseDetectorHtml.web')
   : require('../utils/poseDetectorHtml');
-
-const POSE_PREVIEW_REPEAT_COUNT = 2;
-const FEEDBACK_COOLDOWN_MS = 3500;
-const MOTIVATION_COOLDOWN_MS = 22000;
-const MILESTONE_COOLDOWN_MS = 2500;
-const REP_MILESTONES = [5, 10, 15, 20, 25, 30, 40, 50];
-const HOLD_MILESTONES = [10, 20, 30, 45, 60, 90, 120];
-const AI_PLAN_STORAGE_KEY = 'bodify:web-workout-plan';
-const MOTIVATION_LINES = [
-  'Keep that pace going.',
-  'Stay locked in. You are doing great.',
-  'Nice work. Keep your form controlled.',
-  'Strong effort. Keep pushing.',
-  'You are in rhythm now. Stay with it.',
-];
-
-const resolveSafePosePreviewAnimation = (animationType: string, gender: string) => {
-  const requestedConfig = resolveAvatarAnimationConfig(animationType, gender);
-  if (requestedConfig?.asset && !requestedConfig?.disabled) {
-    return requestedConfig.key;
-  }
-
-  const fallbackCandidates = [
-    AVATAR_ANIMATIONS.WARMUP,
-    AVATAR_ANIMATIONS.SQUAT,
-    AVATAR_ANIMATIONS.PUSHUP,
-  ];
-
-  for (const candidate of fallbackCandidates) {
-    const candidateConfig = resolveAvatarAnimationConfig(candidate, gender);
-    if (candidateConfig?.asset && !candidateConfig?.disabled) {
-      return candidateConfig.key;
-    }
-  }
-
-  return AVATAR_ANIMATIONS.WARMUP;
-};
-
-const buildStablePosePreviewDemo = (animationType: string, gender: string) => {
-  const safeAnimationType = resolveSafePosePreviewAnimation(animationType, gender);
-  const animationConfig = resolveAvatarAnimationConfig(safeAnimationType, gender);
-  const isLooping = animationConfig?.loop !== false;
-
-  return {
-    animationType: safeAnimationType,
-    label: `${animationConfig?.label || safeAnimationType} Preview`,
-    sequence: [{
-      animationType: safeAnimationType,
-      duration: getAvatarAnimationDuration(safeAnimationType, gender, isLooping ? 2600 : 1800),
-      repeatCount: isLooping ? 1 : POSE_PREVIEW_REPEAT_COUNT,
-    }],
-  };
-};
-
-const resolveAiPlanRaw = (aiPlanParam: unknown) => {
-  const aiPlanFromQuery = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('aiPlan') || ''
-    : '';
-  const aiPlanFromSession = typeof window !== 'undefined'
-    ? (() => {
-        try {
-          return window.sessionStorage.getItem(AI_PLAN_STORAGE_KEY) || '';
-        } catch (_) {
-          return '';
-        }
-      })()
-    : '';
-  const rawAiPlanValue = typeof aiPlanParam === 'string' && aiPlanParam.length > 0
-    ? aiPlanParam
-    : aiPlanFromQuery || aiPlanFromSession;
-
-  if (!rawAiPlanValue) {
-    return '';
-  }
-
-  try {
-    return decodeURIComponent(rawAiPlanValue);
-  } catch (_) {
-    return rawAiPlanValue;
-  }
-};
-
-const inferPoseExerciseFromItem = (item: any = {}) => {
-  const label = String(item?.label || '').toLowerCase();
-
-  if (label.includes('single-leg') || label.includes('pistol')) return 'lunge';
-  if (label.includes('push')) return 'pushup';
-  if (label.includes('plank')) return 'plank';
-  if (label.includes('sit')) return 'situp';
-  if (label.includes('bicycle')) return 'bicycle_crunch';
-  if (label.includes('circle')) return 'circle_crunch';
-  if (label.includes('crunch')) return 'crunch';
-  if (label.includes('jack')) return 'jumping_jacks';
-  if (label.includes('burpee')) return 'burpee';
-  if (label.includes('run')) return 'running';
-  if (label.includes('warm')) return 'warmup';
-  if (label.includes('tree')) return 'tree_pose';
-  if (label.includes('meditat')) return 'meditation';
-  if (label.includes('pike')) return 'pike_walk';
-  if (label.includes('crouch')) return 'crouch_hold';
-  if (label.includes('squat')) return 'squat';
-
-  return getPoseExerciseForAnimation(item?.animationType) || '';
-};
-
-const inferPlanTarget = (item: any = {}) => {
-  const key = String(item?.poseExercise || inferPoseExerciseFromItem(item) || item?.label || '').toLowerCase();
-
-  if (key.includes('warm') || key.includes('run')) {
-    return { targetValue: 60, targetUnit: 'sec', targetLabel: '60 sec' };
-  }
-  if (key.includes('plank') || key.includes('meditat') || key.includes('tree') || key.includes('hold')) {
-    return { targetValue: 30, targetUnit: 'sec', targetLabel: '30 sec' };
-  }
-  if (key.includes('pistol') || key.includes('single')) {
-    return { targetValue: 8, targetUnit: 'reps', targetLabel: '8 reps' };
-  }
-
-  return { targetValue: 10, targetUnit: 'reps', targetLabel: '10 reps' };
-};
-
-const normalizePlanExercise = (item: any = {}, index: number) => {
-  const fallbackTarget = inferPlanTarget(item);
-  const targetValue = Number(item?.targetValue);
-  const targetUnit = String(item?.targetUnit || fallbackTarget.targetUnit);
-  const resolvedTargetValue = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : fallbackTarget.targetValue;
-  const targetLabel = item?.targetLabel || `${resolvedTargetValue} ${targetUnit === 'sec' ? 'sec' : 'reps'}`;
-
-  return {
-    id: String(item?.id || item?.poseExercise || item?.animationType || item?.label || `plan-item-${index}`),
-    label: String(item?.label || `Exercise ${index + 1}`),
-    poseExercise: item?.poseExercise || inferPoseExerciseFromItem(item) || '',
-    animationType: item?.animationType || '',
-    targetValue: resolvedTargetValue,
-    targetUnit,
-    targetLabel,
-  };
-};
-
-const formatTimerLabel = (seconds: number) => {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-  return safeSeconds >= 3600
-    ? new Date(safeSeconds * 1000).toISOString().slice(11, 19)
-    : new Date(safeSeconds * 1000).toISOString().slice(14, 19);
-};
 
 export default function PoseScreen() {
   const params = useLocalSearchParams();
@@ -180,6 +48,7 @@ export default function PoseScreen() {
   const selectedPhotoUri = user.photoUri || '';
   const selectedModel = resolveAvatarModelSelection(user.avatarModel, selectedGender);
   const [reps, setReps] = useState(0);
+  const [compactDetailTab, setCompactDetailTab] = useState<'guide' | 'plan'>('guide');
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [activeStepStartedAt, setActiveStepStartedAt] = useState<number | null>(null);
@@ -784,7 +653,7 @@ export default function PoseScreen() {
         }));
         dispatch(addBadgeXP({
           amount: WEEK_XP,
-          categories: ['workout', 'strongman', 'mass'],
+          source: 'workout',
         }));
         dispatch(markWeeklyXPAwarded({ weekKey }));
       }
@@ -804,7 +673,7 @@ export default function PoseScreen() {
 
     setSaveSummaryModal({
       title: sessionTitle,
-      xp: Math.max(0, Number(sessionRecord.awardedXP) || 0) + weeklyBonusXP,
+      xp: Math.max(0, Number((sessionRecord as any).awardedXP) || 0) + weeklyBonusXP,
       calories,
       elapsedSeconds,
       nextAiPlan,
@@ -940,8 +809,9 @@ export default function PoseScreen() {
             </TouchableOpacity>
           </View>
           <View style={[styles.avatarStage, styles.avatarStageCompact, styles.avatarStageCompactMobile]}>
+            <ErrorBoundary fallbackMessage="Avatar failed to load.">
             <InteractiveAvatar
-              ref={avatarRef}
+              {...{ ref: avatarRef } as any}
               model={selectedModel}
               gender={selectedGender}
               height={selectedHeight}
@@ -954,6 +824,7 @@ export default function PoseScreen() {
               alignFootToBottom={true}
               bottomPadding={0.02}
             />
+            </ErrorBoundary>
           </View>
           <View style={styles.mergedCardDivider} />
           <View style={styles.compactMovePickerHeader}>
@@ -1068,8 +939,9 @@ export default function PoseScreen() {
           </TouchableOpacity>
         </View>
         <View style={[styles.avatarStage, isCompactMobile && styles.avatarStageCompact]}>
+          <ErrorBoundary fallbackMessage="Avatar failed to load.">
           <InteractiveAvatar
-            ref={avatarRef}
+            {...{ ref: avatarRef } as any}
             model={selectedModel}
             gender={selectedGender}
             height={selectedHeight}
@@ -1082,6 +954,7 @@ export default function PoseScreen() {
             alignFootToBottom={true}
             bottomPadding={0.02}
           />
+          </ErrorBoundary>
         </View>
       </View>
     );
@@ -1377,7 +1250,7 @@ export default function PoseScreen() {
             domStorageEnabled
             originWhitelist={['*']}
             mixedContentMode="always"
-            onPermissionRequest={(e) => e.nativeEvent.grant(e.nativeEvent.resources)}
+            onPermissionRequest={(e: any) => e.nativeEvent.grant(e.nativeEvent.resources)}
           />
         ) : (
           <View style={[styles.phoneFrame, isCompactMobile && styles.phoneFrameCompact]}>
@@ -1420,8 +1293,9 @@ export default function PoseScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.compactOverlayAvatarStage}>
+          <ErrorBoundary fallbackMessage="Avatar failed to load.">
           <InteractiveAvatar
-            ref={avatarRef}
+            {...{ ref: avatarRef } as any}
             model={selectedModel}
             gender={selectedGender}
             height={selectedHeight}
@@ -1434,6 +1308,7 @@ export default function PoseScreen() {
             alignFootToBottom={true}
             bottomPadding={0.02}
           />
+          </ErrorBoundary>
         </View>
         <View style={styles.compactMovePickerHeader}>
           <View>
@@ -1479,7 +1354,7 @@ export default function PoseScreen() {
       <View style={styles.compactPersistentPlanHeader}>
         <View style={styles.compactPersistentPlanLeadGroup}>
           <View style={styles.compactPersistentPlanBackButtonWrap}>
-            <BackButton onPress={handlePoseBack} />
+            <BackButton {...{ onPress: handlePoseBack } as any} />
           </View>
           <View style={styles.compactPersistentPlanTitleWrap}>
             <Text style={styles.sectionEyebrow}>Workout Plan</Text>
@@ -1648,7 +1523,7 @@ export default function PoseScreen() {
             domStorageEnabled
             originWhitelist={['*']}
             mixedContentMode="always"
-            onPermissionRequest={(e) => e.nativeEvent.grant(e.nativeEvent.resources)}
+            onPermissionRequest={(e: any) => e.nativeEvent.grant(e.nativeEvent.resources)}
           />
         ) : (
           <iframe ref={iframeRef} src={iframeSrc || undefined} srcDoc={iframeSrc ? undefined : POSE_DETECTOR_HTML} style={iframeStyle} allow="camera *; microphone *;" />
@@ -1817,7 +1692,7 @@ function PillButton({ label, onPress, variant = 'primary' }: { label: string; on
     : ['#00E7FF', '#6A00FF'];
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-      <LinearGradient colors={colors} start={{x:0,y:0}} end={{x:1,y:1}} style={[styles.btn, variant === 'secondary' && styles.btnSecondary]}> 
+      <LinearGradient colors={colors as any} start={{x:0,y:0}} end={{x:1,y:1}} style={[styles.btn, variant === 'secondary' && styles.btnSecondary]}> 
         <Text style={styles.btnText}>{label}</Text>
       </LinearGradient>
     </TouchableOpacity>
@@ -2489,7 +2364,7 @@ const styles = StyleSheet.create({
   exerciseChipText: { color: '#F4FBFF', fontSize: 12, fontWeight: '700' },
   exerciseGridViewport: { maxHeight: 154 },
   exerciseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, width: '100%' },
-  exerciseCardTouch: { width: Platform.OS === 'web' ? 'calc(50% - 5px)' : undefined },
+  exerciseCardTouch: { width: Platform.OS === 'web' ? 'calc(50% - 5px)' as any : undefined },
   exerciseCard: { minWidth: 146, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.1)' },
   exerciseCardActive: { borderColor: 'rgba(255,255,255,0.28)' },
   exerciseCardText: { color:'#EAF7FF', fontWeight:'800', fontSize:13 },
@@ -2630,4 +2505,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
-});
+}) as unknown as Record<string, any>;

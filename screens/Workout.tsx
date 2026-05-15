@@ -17,14 +17,14 @@ import { getPoseExerciseForAnimation } from '../utils/poseExerciseConfig';
 const PREVIEW_LOOP_REPEAT_COUNT = 999;
 const WORKOUT_ANIMATION_TYPE_SET = new Set(WORKOUT_ANIMATION_TYPES.map((value) => String(value || '').toLowerCase()));
 
-const normalizeAnimationLookupValue = (value) => String(value || '')
+const normalizeAnimationLookupValue = (value: any): string => String(value || '')
   .trim()
   .toLowerCase()
   .replace(/['’]/g, '')
   .replace(/[^a-z0-9]+/g, '_')
   .replace(/^_+|_+$/g, '');
 
-const buildAnimationLookupCandidates = (value) => {
+const buildAnimationLookupCandidates = (value: any): string[] => {
   const base = normalizeAnimationLookupValue(value);
   if (!base) return [];
 
@@ -40,7 +40,7 @@ const createEditableWorkoutPlan = () => ({
   title: 'Workout Plan',
   summary: 'Build a workout by adding exercises below or jump in from Today\'s Workout.',
   durationMin: 0,
-  exercises: [],
+  exercises: [] as any[],
 });
 
 const SAMPLE_ASSET_WORKOUTS = [
@@ -131,7 +131,7 @@ const WEARABLE_PROVIDERS = [
   { key: 'apple-health', label: 'Apple Health', status: 'soon' },
 ];
 
-const resolveImportedActivityType = (activity = {}) => {
+const resolveImportedActivityType = (activity: any = {}) => {
   const raw = `${activity?.sport_type || ''} ${activity?.type || ''}`.toLowerCase();
   if (raw.includes('run') || raw.includes('jog') || raw.includes('treadmill')) return 'running';
   if (raw.includes('ride') || raw.includes('cycle') || raw.includes('bike')) return 'cycling';
@@ -140,7 +140,7 @@ const resolveImportedActivityType = (activity = {}) => {
   return 'cardio';
 };
 
-const getSessionTypeIconName = (type) => {
+const getSessionTypeIconName = (type: any) => {
   const normalizedType = String(type || '').toLowerCase();
   if (normalizedType.includes('strength')) return 'barbell';
   if (normalizedType.includes('run')) return 'walk';
@@ -150,7 +150,7 @@ const getSessionTypeIconName = (type) => {
   return 'flash';
 };
 
-const getExerciseCapabilityLabel = (exercise) => {
+const getExerciseCapabilityLabel = (exercise: any) => {
   const hasPreview = !!exercise?.animationType;
   const hasPose = !!exercise?.poseExercise;
 
@@ -159,7 +159,7 @@ const getExerciseCapabilityLabel = (exercise) => {
   return 'Preview-unready · Pose-unready';
 };
 
-const buildExerciseLoopSequence = (animationType, gender) => {
+const buildExerciseLoopSequence = (animationType: any, gender: any) => {
   switch (String(animationType || '').toLowerCase()) {
     case AVATAR_ANIMATIONS.PUSHUP:
       return [{
@@ -197,9 +197,9 @@ export default function Workout({ aiPlanRaw = '' }) {
   const dispatch = useDispatch();
   const params = useLocalSearchParams();
   const router = useRouter();
-  const sessionsByDate = useSelector((state) => state.workouts?.sessionsByDate || {});
-  const user = useSelector((state) => state.user || {});
-  const avatarRef = React.useRef(null);
+  const sessionsByDate = useSelector((state: any) => state.workouts?.sessionsByDate || {});
+  const user = useSelector((state: any) => state.user || {});
+  const avatarRef = React.useRef<any>(null);
   const selectedGender = String(user.gender || 'male');
   const selectedHeight = String(user.height || '175');
   const selectedWeight = String(user.weight || '70');
@@ -217,10 +217,10 @@ export default function Workout({ aiPlanRaw = '' }) {
   // ExerciseDB state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPart, setSelectedPart] = useState('');
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<any[]>([]);
   const [resultsLoading, setResultsLoading] = useState(false);
   const [exdbError, setExdbError] = useState('');
-  const [parts, setParts] = useState([]);
+  const [parts, setParts] = useState<any[]>([]);
   const [partsLoading, setPartsLoading] = useState(false);
   const [sampleWorkoutsExpanded, setSampleWorkoutsExpanded] = useState(false);
   const [debugXpNotice, setDebugXpNotice] = useState('');
@@ -253,9 +253,9 @@ export default function Workout({ aiPlanRaw = '' }) {
       try {
         setPartsLoading(true);
         const data = await listBodyParts();
-        if (!cancelled) setParts(Array.isArray(data) ? data : []);
-      } catch (e) {
-        if (!cancelled) setExdbError(String(e?.message || e));
+        if (!cancelled) setParts(Array.isArray(data) ? data as any[] : []);
+      } catch (e: unknown) {
+        if (!cancelled) setExdbError(String((e as Error)?.message || e));
       } finally {
         if (!cancelled) setPartsLoading(false);
       }
@@ -295,11 +295,11 @@ export default function Workout({ aiPlanRaw = '' }) {
     };
   }, []);
 
-  const resolvePoseExercise = useCallback((animationType) => {
+  const resolvePoseExercise = useCallback((animationType: any) => {
     return getPoseExerciseForAnimation(animationType);
   }, []);
 
-  const resolveSupportedAnimationType = useCallback((animationType) => {
+  const resolveSupportedAnimationType = useCallback((animationType: any) => {
     const normalizedType = String(animationType || '').trim().toLowerCase();
     if (!normalizedType) return null;
 
@@ -321,12 +321,14 @@ export default function Workout({ aiPlanRaw = '' }) {
     }));
     dispatch(addBadgeXP({
       amount,
-      categories: ['workout'],
+      source: 'workout',
+      title: 'Workout test XP',
+      subtitle: `${amount} XP added for sync check`,
     }));
     setDebugXpNotice(`Added ${amount} workout XP for sync check.`);
   }, [dispatch]);
 
-  const normalizePlanExercise = useCallback((exercise) => {
+  const normalizePlanExercise = useCallback((exercise: any) => {
     const animationType = resolveSupportedAnimationType(exercise?.animationType);
     const poseExercise = resolvePoseExercise(animationType);
 
@@ -337,7 +339,7 @@ export default function Workout({ aiPlanRaw = '' }) {
     };
   }, [resolvePoseExercise, resolveSupportedAnimationType]);
 
-  const canPreviewExercise = useCallback((exercise) => {
+  const canPreviewExercise = useCallback((exercise: any) => {
     return !!exercise?.animationType && !!exercise?.poseExercise;
   }, []);
 
@@ -354,7 +356,7 @@ export default function Workout({ aiPlanRaw = '' }) {
     });
   }, [normalizePlanExercise]);
 
-  const previewAiExercise = useCallback((exercise) => {
+  const previewAiExercise = useCallback((exercise: any) => {
     const normalizedExercise = normalizePlanExercise(exercise);
     if (!canPreviewExercise(normalizedExercise)) {
       setCoachLabel(`${normalizedExercise?.label || 'Exercise'} added · pose preview unavailable`);
@@ -384,7 +386,7 @@ export default function Workout({ aiPlanRaw = '' }) {
     return () => clearTimeout(timer);
   }, [aiPlanRaw]);
 
-  const resolveExerciseAnimationFromName = useCallback((exerciseName) => {
+  const resolveExerciseAnimationFromName = useCallback((exerciseName: any) => {
     const candidates = buildAnimationLookupCandidates(exerciseName);
 
     for (const candidate of candidates) {
@@ -408,13 +410,13 @@ export default function Workout({ aiPlanRaw = '' }) {
     setWorkoutPlan({
       ...aiPlan,
       exercises: Array.isArray(aiPlan.exercises)
-        ? aiPlan.exercises.map((item) => normalizePlanExercise(item))
+        ? aiPlan.exercises.map((item: any) => normalizePlanExercise(item))
         : [],
     });
   }, [aiPlan, normalizePlanExercise]);
 
-  const buildPlanExerciseFromApi = useCallback((exercise) => {
-    const label = (exercise?.name || 'Exercise').replace(/\b\w/g, (m) => m.toUpperCase());
+  const buildPlanExerciseFromApi = useCallback((exercise: any) => {
+    const label = (exercise?.name || 'Exercise').replace(/\b\w/g, (m: string) => m.toUpperCase());
     const animationType = resolveExerciseAnimationFromName(exercise?.name);
     const poseExercise = resolvePoseExercise(animationType);
 
@@ -431,25 +433,25 @@ export default function Workout({ aiPlanRaw = '' }) {
     try {
       setExdbError('');
       setResultsLoading(true);
-      let data = [];
+      let data: any[] = [];
       const query = searchQuery.trim();
       if (query) {
-        data = await searchExercises(query, 0, 20);
+        data = (await searchExercises(query, 0, 20)) as any[];
       } else if (selectedPart) {
-        data = await listByBodyPart(selectedPart, 0, 20);
+        data = (await listByBodyPart(selectedPart, 0, 20)) as any[];
       } else {
         data = [];
       }
       setResults(Array.isArray(data) ? data : []);
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn('ExerciseDB search/list failed', e);
-      setExdbError(String(e?.message || e));
+      setExdbError(String((e as Error)?.message || e));
     } finally {
       setResultsLoading(false);
     }
   };
 
-  const pickPart = async (part) => {
+  const pickPart = async (part: any) => {
     const next = part === selectedPart ? '' : part;
     setSelectedPart(next);
     setSearchQuery('');
@@ -460,17 +462,17 @@ export default function Workout({ aiPlanRaw = '' }) {
     try {
       setExdbError('');
       setResultsLoading(true);
-      const data = await listByBodyPart(next, 0, 20);
+      const data = (await listByBodyPart(next, 0, 20)) as any[];
       setResults(Array.isArray(data) ? data : []);
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn('ExerciseDB list failed', e);
-      setExdbError(String(e?.message || e));
+      setExdbError(String((e as Error)?.message || e));
     } finally {
       setResultsLoading(false);
     }
   };
 
-  const addExerciseToWorkoutPlan = useCallback((exercise) => {
+  const addExerciseToWorkoutPlan = useCallback((exercise: any) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const planExercise = buildPlanExerciseFromApi(exercise);
 
@@ -496,7 +498,7 @@ export default function Workout({ aiPlanRaw = '' }) {
     setCoachLabel(`${planExercise.label} added · pose preview unavailable`);
   }, [buildPlanExerciseFromApi, canPreviewExercise, previewAiExercise]);
 
-  const removeExerciseFromWorkoutPlan = useCallback((indexToRemove) => {
+  const removeExerciseFromWorkoutPlan = useCallback((indexToRemove: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
     setWorkoutPlan((currentPlan) => {
@@ -519,7 +521,7 @@ export default function Workout({ aiPlanRaw = '' }) {
     });
   }, []);
 
-  const loadSampleWorkoutPlan = useCallback((samplePlan) => {
+  const loadSampleWorkoutPlan = useCallback((samplePlan: any) => {
     if (!samplePlan) return;
 
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -531,7 +533,7 @@ export default function Workout({ aiPlanRaw = '' }) {
     });
 
     const firstPreviewableExercise = Array.isArray(samplePlan.exercises)
-      ? samplePlan.exercises.find((item) => canPreviewExercise(item))
+      ? samplePlan.exercises.find((item: any) => canPreviewExercise(item))
       : null;
 
     if (firstPreviewableExercise) {
@@ -541,7 +543,7 @@ export default function Workout({ aiPlanRaw = '' }) {
     }
   }, [canPreviewExercise, previewAiExercise]);
 
-  const appendSampleWorkoutPlan = useCallback((samplePlan) => {
+  const appendSampleWorkoutPlan = useCallback((samplePlan: any) => {
     if (!samplePlan || !Array.isArray(samplePlan.exercises) || samplePlan.exercises.length === 0) return;
 
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -557,7 +559,7 @@ export default function Workout({ aiPlanRaw = '' }) {
       };
     });
 
-    const firstPreviewableExercise = samplePlan.exercises.find((item) => canPreviewExercise(item));
+    const firstPreviewableExercise = samplePlan.exercises.find((item: any) => canPreviewExercise(item));
     if (firstPreviewableExercise) {
       previewAiExercise(firstPreviewableExercise);
     } else {
@@ -589,7 +591,7 @@ export default function Workout({ aiPlanRaw = '' }) {
     );
   }, [dispatch, todayKey, workoutPlan]);
 
-  const openOutdoorTracker = useCallback((mode) => {
+  const openOutdoorTracker = useCallback((mode: any) => {
     if (!mode) return;
     setCoachLabel(`${mode.coachLabel} · opening live tracker`);
     router.push({
@@ -626,7 +628,7 @@ export default function Workout({ aiPlanRaw = '' }) {
   ), [recent]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={(styles as any).contentContainer} showsVerticalScrollIndicator={false}>
       <LinearGradient colors={["#0d1024", "#0a0f1e"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerWrap}>
         <LinearGradient colors={["rgba(122,92,255,0.35)", "rgba(0,234,255,0.35)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <BackButton />
@@ -748,7 +750,7 @@ export default function Workout({ aiPlanRaw = '' }) {
           <View style={styles.previewStagePanel}>
             <View style={[styles.avatarStage, styles.avatarStageCompact]}>
               <InteractiveAvatar
-                ref={avatarRef}
+                {...{ ref: avatarRef } as any}
                 model={selectedModel}
                 gender={selectedGender}
                 height={selectedHeight}
@@ -786,7 +788,7 @@ export default function Workout({ aiPlanRaw = '' }) {
             <View key={mode.key} style={styles.modeCard}>
               <View style={styles.modeCardHeader}>
                 <View style={styles.modeIconWrap}>
-                  <Ionicons name={mode.icon} size={18} color="#dff8ff" />
+                  <Ionicons name={mode.icon as any} size={18} color="#dff8ff" />
                 </View>
                 <Text style={styles.modeCardMeta}>{`${mode.durationMin} min starter`}</Text>
               </View>
@@ -1019,7 +1021,7 @@ export default function Workout({ aiPlanRaw = '' }) {
                   </View>
                 )}
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.itemTitle}>{(item.name || 'Exercise').replace(/\b\w/g, (m) => m.toUpperCase())}</Text>
+                  <Text style={styles.itemTitle}>{(item.name || 'Exercise').replace(/\b\w/g, (m: string) => m.toUpperCase())}</Text>
                   <Text style={styles.itemMeta}>{[item.bodyPart, item.target, item.equipment].filter(Boolean).join(' · ')}</Text>
                 </View>
                 <Pressable onPress={() => addExerciseToWorkoutPlan(item)} style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}>

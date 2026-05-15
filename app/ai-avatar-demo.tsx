@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSelector } from 'react-redux';
+import ErrorBoundary from '../components/ErrorBoundary';
 import InteractiveAvatar from '../components/InteractiveAvatar';
 import ScreenFrame from '../components/ScreenFrame';
 import { AVATAR_PERSONALITIES, useAIAvatar } from '../components/useAIAvatar';
@@ -31,7 +32,7 @@ const FBX_TEST_ACTIONS = RECOMMENDED_FBX_ANIMATION_OPTIONS.map((animation) => ({
  */
 export default function AIAvatarDemo() {
   const router = useRouter();
-  const user = useSelector((state) => state.user || {});
+  const user = useSelector((state: any) => state.user || {});
   const selectedGender = String(user.gender || 'male');
   const selectedHeight = String(user.height || '175');
   const selectedWeight = String(user.weight || '70');
@@ -66,22 +67,22 @@ export default function AIAvatarDemo() {
   const [liveConnected, setLiveConnected] = useState(false);
   const [liveThinking, setLiveThinking] = useState(false);
   const [liveResponse, setLiveResponse] = useState('');
-  const [liveError, setLiveError] = useState(null);
-  const [liveConversationHistory, setLiveConversationHistory] = useState([]);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [liveConversationHistory, setLiveConversationHistory] = useState<any[]>([]);
   const [avatarConversationState, setAvatarConversationState] = useState('idle');
   const [animationTestLabel, setAnimationTestLabel] = useState('idle');
-  const scrollViewRef = useRef(null);
-  const avatarRef = useRef(null);
-  const liveServiceRef = useRef(null);
-  const liveTurnTimeoutRef = useRef(null);
+  const scrollViewRef = useRef<any>(null);
+  const avatarRef = useRef<any>(null);
+  const liveServiceRef = useRef<any>(null);
+  const liveTurnTimeoutRef = useRef<any>(null);
 
-  const syncAvatarState = useCallback((nextState) => {
+  const syncAvatarState = useCallback((nextState: any) => {
     const normalized = String(nextState || 'idle').toLowerCase();
     setAvatarConversationState(normalized);
     avatarRef.current?.setConversationState?.(normalized);
   }, []);
 
-  const speakWithAvatar = useCallback((text, options = {}) => {
+  const speakWithAvatar = useCallback((text: any, options: any = {}) => {
     const payload = String(text || '').trim();
     if (!payload) return;
     avatarRef.current?.speak?.(payload, {
@@ -134,9 +135,9 @@ export default function AIAvatarDemo() {
         liveTurnTimeoutRef.current = setTimeout(() => {
           setLiveThinking(false);
         }, 9000);
-      } catch (error) {
+      } catch (error: unknown) {
         setLiveThinking(false);
-        setLiveError(error.message || 'Failed to send live message');
+        setLiveError((error as Error).message || 'Failed to send live message');
       }
     } else {
       await chat(message);
@@ -148,7 +149,7 @@ export default function AIAvatarDemo() {
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 300);
   };
 
-  const handlePersonalityChange = (personality) => {
+  const handlePersonalityChange = (personality: any) => {
     setSelectedPersonality(personality);
     setPersonality(personality);
   };
@@ -164,7 +165,7 @@ export default function AIAvatarDemo() {
     router.push('/Pose');
   };
 
-  const handleAnimationTest = useCallback((action) => {
+  const handleAnimationTest = useCallback((action: any) => {
     if (!action || !avatarRef.current) return;
 
     setAnimationTestLabel(String(action.label || action.value || 'idle').toLowerCase());
@@ -184,8 +185,8 @@ export default function AIAvatarDemo() {
       const timer = setTimeout(() => {
         speakWithAvatar(aiResponse, {
           onEnd: () => {
-            if (latestAiOutcome?.workoutDemo) {
-              avatarRef.current?.triggerWorkoutDemo?.(latestAiOutcome.workoutDemo);
+            if ((latestAiOutcome as any)?.workoutDemo) {
+              avatarRef.current?.triggerWorkoutDemo?.((latestAiOutcome as any).workoutDemo);
             }
           },
         });
@@ -212,16 +213,16 @@ export default function AIAvatarDemo() {
       onClose: () => {
         setLiveConnected(false);
       },
-      onError: (error) => {
+      onError: (error: any) => {
         setLiveThinking(false);
         setLiveError(error?.message || 'Gemini Live connection error');
       },
-      onText: (text) => {
+      onText: (text: any) => {
         setLiveResponse(text);
         // First streamed token means model is responsive; keep input/send usable.
         setLiveThinking(false);
       },
-      onTurnComplete: (text) => {
+      onTurnComplete: (text: any) => {
         setLiveThinking(false);
         if (liveTurnTimeoutRef.current) {
           clearTimeout(liveTurnTimeoutRef.current);
@@ -235,8 +236,8 @@ export default function AIAvatarDemo() {
     });
 
     liveServiceRef.current = service;
-    service.connect().catch((error) => {
-      setLiveError(error.message || 'Unable to connect to Gemini Live');
+    service.connect().catch((error: unknown) => {
+      setLiveError((error as Error).message || 'Unable to connect to Gemini Live');
       setLiveConnected(false);
     });
 
@@ -292,8 +293,9 @@ export default function AIAvatarDemo() {
 
         {/* Large Avatar */}
         <View style={styles.largeAvatarSection}>
+          <ErrorBoundary fallbackMessage="Avatar failed to load. Tap to retry.">
           <InteractiveAvatar
-            ref={avatarRef}
+            {...{ ref: avatarRef } as any}
             model={selectedModel}
             gender={selectedGender}
             height={selectedHeight}
@@ -311,6 +313,7 @@ export default function AIAvatarDemo() {
             enableVoice={liveMode}
             enableTTS={true}
           />
+          </ErrorBoundary>
           {displayedThinking && (
             <View style={styles.thinkingBubble}>
               <ActivityIndicator size="small" color="#4F8EF7" />

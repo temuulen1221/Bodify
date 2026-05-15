@@ -19,19 +19,19 @@ export default function DietScreen() {
     setSelectedItem(null);
     setDetails(null);
     try {
-      const data = await generateMealPlan(mealPlanTimeFrame, mealPlanCalories, mealPlanDiet);
-      setResults(data.meals || []);
-    } catch (e) {
-      setError(e.message);
+      const data = await generateMealPlan(mealPlanTimeFrame, Number(mealPlanCalories), mealPlanDiet) as any;
+      setResults((data as any).meals || []);
+    } catch (e: unknown) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   };
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [details, setDetails] = useState(null);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [details, setDetails] = useState<any>(null);
   const [error, setError] = useState('');
   const [category, setCategory] = useState('foods');
 
@@ -64,29 +64,29 @@ export default function DietScreen() {
     try {
       let data;
       if (category === 'foods') {
-        data = await searchFoods(query);
-        setResults(data.results || []);
+        data = await searchFoods(query) as any;
+        setResults((data as any).results || []);
       } else if (category === 'recipes') {
-        data = await searchRecipes(query);
-        setResults(data.results || []);
+        data = await searchRecipes(query) as any;
+        setResults((data as any).results || []);
       } else if (category === 'mealplans') {
-        data = await generateMealPlan('day', 2000, '');
-        setResults(data.meals || []);
+        data = await generateMealPlan('day', 2000, '') as any;
+        setResults((data as any).meals || []);
       } else if (category === 'ingredients') {
-        data = await searchFoods(query);
-        setResults(data.results || []);
+        data = await searchFoods(query) as any;
+        setResults((data as any).results || []);
       } else if (category === 'trivia') {
         data = await getFoodTrivia();
-        setResults([data]);
+        setResults([data] as any[]);
       }
-    } catch (e) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectItem = async (item) => {
+  const handleSelectItem = async (item: any) => {
     setSelectedItem(item);
     setDetails(null);
     setLoading(true);
@@ -103,8 +103,8 @@ export default function DietScreen() {
         info = item;
       }
       setDetails(info);
-    } catch (e) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -149,7 +149,7 @@ export default function DietScreen() {
           <Picker.Item label="Trivia" value="trivia" />
           <Picker.Item label="Meal Plan Generator" value="mealplan_gen" />
         </Picker>
-        <Text style={styles.explanation}>{category === 'mealplan_gen' ? 'Generate a custom meal plan for a day or week based on your calorie and diet preferences.' : categoryExplanations[category]}</Text>
+        <Text style={styles.explanation}>{category === 'mealplan_gen' ? 'Generate a custom meal plan for a day or week based on your calorie and diet preferences.' : categoryExplanations[category as keyof typeof categoryExplanations]}</Text>
         {(category === 'mealplan_gen') && (
           <View style={styles.mealPlanOptions}>
             <Text style={styles.detailLabel}>Calories:</Text>
@@ -207,7 +207,7 @@ export default function DietScreen() {
                           {details.extendedIngredients && details.extendedIngredients.length > 0 && (
                             <View style={styles.detailSubSection}>
                               <Text style={styles.detailLabel}>Ingredients:</Text>
-                              {details.extendedIngredients.map((ing, idx) => (
+                              {details.extendedIngredients.map((ing: any, idx: number) => (
                                 <Text key={idx} style={styles.detailValue} numberOfLines={2} ellipsizeMode="tail">• {ing.original}</Text>
                               ))}
                             </View>
@@ -215,7 +215,7 @@ export default function DietScreen() {
                           {details.analyzedInstructions && details.analyzedInstructions.length > 0 && (
                             <View style={styles.detailSubSection}>
                               <Text style={styles.detailLabel}>Instructions:</Text>
-                              {details.analyzedInstructions[0].steps.map((step, idx) => (
+                              {details.analyzedInstructions[0].steps.map((step: any, idx: number) => (
                                 <Text key={idx} style={styles.detailValue} numberOfLines={2} ellipsizeMode="tail">{idx + 1}. {step.step}</Text>
                               ))}
                             </View>
@@ -277,13 +277,13 @@ export default function DietScreen() {
                     <Text style={styles.detailLabel}>Name:</Text>
                     <Text style={styles.detailValue}>{details.name}</Text>
                     <Text style={styles.detailLabel}>Calories:</Text>
-                    <Text style={styles.detailValue}>{details.nutrition?.nutrients?.find(n => n.name === 'Calories')?.amount || 'N/A'}</Text>
+                    <Text style={styles.detailValue}>{details.nutrition?.nutrients?.find((n: any) => n.name === 'Calories')?.amount || 'N/A'}</Text>
                     <Text style={styles.detailLabel}>Protein:</Text>
-                    <Text style={styles.detailValue}>{details.nutrition?.nutrients?.find(n => n.name === 'Protein')?.amount || 'N/A'}g</Text>
+                    <Text style={styles.detailValue}>{details.nutrition?.nutrients?.find((n: any) => n.name === 'Protein')?.amount || 'N/A'}g</Text>
                     <Text style={styles.detailLabel}>Fat:</Text>
-                    <Text style={styles.detailValue}>{details.nutrition?.nutrients?.find(n => n.name === 'Fat')?.amount || 'N/A'}g</Text>
+                    <Text style={styles.detailValue}>{details.nutrition?.nutrients?.find((n: any) => n.name === 'Fat')?.amount || 'N/A'}g</Text>
                     <Text style={styles.detailLabel}>Carbs:</Text>
-                    <Text style={styles.detailValue}>{details.nutrition?.nutrients?.find(n => n.name === 'Carbohydrates')?.amount || 'N/A'}g</Text>
+                    <Text style={styles.detailValue}>{details.nutrition?.nutrients?.find((n: any) => n.name === 'Carbohydrates')?.amount || 'N/A'}g</Text>
                   </View>
                 ) : null}
                 {category === 'recipes' || category === 'mealplans' ? (
@@ -304,7 +304,7 @@ export default function DietScreen() {
                     {details.extendedIngredients && details.extendedIngredients.length > 0 && (
                       <View style={styles.detailSubSection}>
                         <Text style={styles.detailLabel}>Ingredients:</Text>
-                        {details.extendedIngredients.map((ing, idx) => (
+                        {details.extendedIngredients.map((ing: any, idx: number) => (
                           <Text key={idx} style={styles.detailValue}>• {ing.original}</Text>
                         ))}
                       </View>
@@ -312,7 +312,7 @@ export default function DietScreen() {
                     {details.analyzedInstructions && details.analyzedInstructions.length > 0 && (
                       <View style={styles.detailSubSection}>
                         <Text style={styles.detailLabel}>Instructions:</Text>
-                        {details.analyzedInstructions[0].steps.map((step, idx) => (
+                        {details.analyzedInstructions[0].steps.map((step: any, idx: number) => (
                           <Text key={idx} style={styles.detailValue}>{idx + 1}. {step.step}</Text>
                         ))}
                       </View>
@@ -356,6 +356,11 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'left',
     maxWidth: 340,
+  },
+  mealPlanOptions: {
+    width: '100%',
+    maxWidth: 340,
+    marginVertical: 8,
   },
   inputWrapper: {
     position: 'relative',

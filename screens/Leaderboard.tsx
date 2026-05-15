@@ -13,8 +13,8 @@ const friendSuggestions = [
 ];
 
 const SELF_ID = 'self-user-row';
-const ensureSelfRow = (list) => {
-  const hasSelf = list.some((l) => l.id === SELF_ID || l.name.toLowerCase() === 'you');
+const ensureSelfRow = (list: any) => {
+  const hasSelf = list.some((l: any) => l.id === SELF_ID || l.name.toLowerCase() === 'you');
   if (hasSelf) return list;
   return [...list, { id: SELF_ID, name: 'You', points: 900, avatar: undefined }];
 };
@@ -32,7 +32,7 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(false);
 
   const searchResults = friendName.trim()
-    ? leaders.filter(f => f.name.toLowerCase().includes(friendName.trim().toLowerCase()))
+    ? leaders.filter((f: any) => f.name.toLowerCase().includes(friendName.trim().toLowerCase()))
     : [];
 
   useEffect(() => {
@@ -41,13 +41,13 @@ export default function Leaderboard() {
     fetchFriendsForLeaderboard()
       .then((data) => {
         if (!mounted) return;
-        const normalized = data.map((f) => ({
+        const normalized = data.map((f: any) => ({
           id: f.id,
           name: f.name,
           points: f.points || 800,
           avatar: f.avatar,
         }));
-        setLeaders(ensureSelfRow(normalized).sort((a, b) => b.points - a.points));
+        setLeaders(ensureSelfRow(normalized).sort((a: any, b: any) => b.points - a.points));
       })
       .catch(() => {})
       .finally(() => mounted && setLoading(false));
@@ -56,11 +56,11 @@ export default function Leaderboard() {
     };
   }, []);
 
-  const addFriendToLeaderboard = async (name) => {
+  const addFriendToLeaderboard = async (name: any) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setLeaders((prev) => {
-      const exists = prev.some(p => p.name.toLowerCase() === trimmed.toLowerCase());
+    setLeaders((prev: any) => {
+      const exists = prev.some((p: any) => p.name.toLowerCase() === trimmed.toLowerCase());
       if (exists) return prev;
       const newEntry = {
         id: `local-${Date.now()}`,
@@ -68,7 +68,7 @@ export default function Leaderboard() {
         points: 800,
         avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(trimmed.toLowerCase())}`,
       };
-      return ensureSelfRow([...prev, newEntry]).sort((a, b) => b.points - a.points);
+      return ensureSelfRow([...prev, newEntry]).sort((a: any, b: any) => b.points - a.points);
     });
     try {
       const docRef = await addDoc(collection(db, 'friends'), {
@@ -79,15 +79,15 @@ export default function Leaderboard() {
         plankSec: 0,
         tag: 'Friend',
       });
-      setLeaders((prev) => {
-        const withoutLocal = prev.filter((p) => !p.id.startsWith('local-') || p.name.toLowerCase() !== trimmed.toLowerCase());
+      setLeaders((prev: any) => {
+        const withoutLocal = prev.filter((p: any) => !p.id.startsWith('local-') || p.name.toLowerCase() !== trimmed.toLowerCase());
         const newEntry = {
           id: docRef.id,
           name: trimmed,
           points: 800,
           avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(trimmed.toLowerCase())}`,
         };
-        return ensureSelfRow([...withoutLocal, newEntry]).sort((a, b) => b.points - a.points);
+        return ensureSelfRow([...withoutLocal, newEntry]).sort((a: any, b: any) => b.points - a.points);
       });
     } catch (err) {
       console.warn('[leaderboard] add friend failed', err);
@@ -191,7 +191,7 @@ export default function Leaderboard() {
                   <Text style={styles.suggestionHint}>{searchResults.length} found</Text>
                 </View>
                 <ScrollView style={styles.resultsList} contentContainerStyle={styles.resultsContent}>
-                  {searchResults.map((user) => (
+                  {searchResults.map((user: any) => (
                     <View key={user.id} style={styles.resultRow}>
                       {user.avatar ? (
                         <Image source={{ uri: user.avatar }} style={styles.resultAvatar} />
@@ -376,27 +376,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#a6ff9f',
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#13182a',
-    borderWidth: 1,
-    borderColor: 'rgba(0,231,255,0.35)',
-  },
-  backIcon: {
-    color: '#00E7FF',
-    fontSize: 18,
-    fontWeight: '700',
   },
   plusButton: {
     width: 32,

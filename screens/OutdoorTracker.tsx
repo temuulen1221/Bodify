@@ -12,18 +12,67 @@ import { requestLocationPermission } from '../services/locationPermissions';
 import { addWorkoutSession } from '../store';
 import { createWorkoutSessionRecord } from '../utils/workoutSessionXP';
 
+type LocationPoint = {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  altitude: number | null;
+  speed: number | null;
+  timestamp: number;
+};
+
+type RouteStep = {
+  id?: string;
+  title?: string;
+  description?: string;
+  subtitle?: string;
+  instruction?: string;
+  maneuver?: string;
+  error?: string;
+  distanceMeters?: number;
+  durationSec?: number;
+};
+
+type PlannedRoute = {
+  coordinates: { latitude: number; longitude: number }[];
+  distanceMeters: number;
+  durationSec: number;
+  summary: string;
+  steps: RouteStep[];
+  source: string;
+  error?: string;
+};
+
+type FinishSummary = {
+  xp: number;
+  distanceKm: number;
+  durationMin: number;
+  calories: number;
+  date: string;
+  session: ReturnType<typeof createWorkoutSessionRecord> & { awardedXP?: number };
+};
+
+type PlaceSuggestion = {
+  id: string;
+  title: string;
+  description?: string;
+  subtitle?: string;
+  latitude?: number;
+  longitude?: number;
+};
+
 const OutdoorLiveMap = Platform.OS === 'web'
   ? require('../components/OutdoorLiveMap.web').default
   : require('../components/OutdoorLiveMap').default;
 
-const toNumber = (value, fallback = 0) => {
+const toNumber = (value: unknown, fallback = 0): number => {
   const normalized = Number(value);
   return Number.isFinite(normalized) ? normalized : fallback;
 };
 
-const deg2rad = (deg) => deg * (Math.PI / 180);
+const deg2rad = (deg: number): number => deg * (Math.PI / 180);
 
-const getDistanceInMeters = (start, end) => {
+const getDistanceInMeters = (start: LocationPoint, end: LocationPoint): number => {
   if (!start || !end) return 0;
   const earthRadius = 6371e3;
   const dLat = deg2rad(end.latitude - start.latitude);
@@ -35,7 +84,7 @@ const getDistanceInMeters = (start, end) => {
   return earthRadius * c;
 };
 
-const formatDuration = (elapsedMs) => {
+const formatDuration = (elapsedMs: number): string => {
   const totalSeconds = Math.max(0, Math.floor((Number(elapsedMs) || 0) / 1000));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -46,7 +95,7 @@ const formatDuration = (elapsedMs) => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
-const formatPace = (distanceMeters, elapsedMs) => {
+const formatPace = (distanceMeters: number, elapsedMs: number): string => {
   if (distanceMeters < 30 || elapsedMs < 1000) return '--';
   const paceSecondsPerKm = (elapsedMs / 1000) / (distanceMeters / 1000);
   if (!Number.isFinite(paceSecondsPerKm) || paceSecondsPerKm <= 0) return '--';
@@ -55,7 +104,7 @@ const formatPace = (distanceMeters, elapsedMs) => {
   return `${minutes}:${String(seconds).padStart(2, '0')} /km`;
 };
 
-const formatAccuracy = (accuracy) => {
+const formatAccuracy = (accuracy: number | null | undefined): string => {
   const normalized = Number(accuracy);
   if (!Number.isFinite(normalized) || normalized <= 0) return 'Waiting';
   if (normalized <= 8) return 'Strong';
@@ -66,7 +115,7 @@ const formatAccuracy = (accuracy) => {
 const MAX_ROUTE_POINT_ACCURACY = 65;
 const MIN_ROUTE_POINT_DISTANCE = 4;
 const MAX_ROUTE_SPEED_MPS = 22;
-const shouldRecordRoutePoint = (previousPoint, nextPoint) => {
+const shouldRecordRoutePoint = (previousPoint: LocationPoint | null, nextPoint: LocationPoint | null): boolean => {
   if (!nextPoint) return false;
 
   const accuracy = Number(nextPoint.accuracy);
@@ -91,25 +140,25 @@ const shouldRecordRoutePoint = (previousPoint, nextPoint) => {
   return true;
 };
 
-const formatRemainingDistance = (distanceMeters) => {
+const formatRemainingDistance = (distanceMeters: number): string => {
   if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return '--';
   if (distanceMeters >= 1000) return `${(distanceMeters / 1000).toFixed(2)} km away`;
   return `${Math.round(distanceMeters)} m away`;
 };
 
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
-const formatSpeed = (speedMps) => {
+const formatSpeed = (speedMps: number): string => {
   if (!Number.isFinite(speedMps) || speedMps <= 0) return '--';
   return `${(speedMps * 3.6).toFixed(1)} km/h`;
 };
 
-const formatElevation = (meters) => {
+const formatElevation = (meters: number): string => {
   if (!Number.isFinite(meters) || meters <= 0) return '0 m';
   return `${Math.round(meters)} m`;
 };
 
-const formatEta = (durationSec) => {
+const formatEta = (durationSec: number): string => {
   if (!Number.isFinite(durationSec) || durationSec <= 0) return '--';
   const totalMinutes = Math.max(1, Math.round(durationSec / 60));
   if (totalMinutes >= 60) {
@@ -120,7 +169,7 @@ const formatEta = (durationSec) => {
   return `${totalMinutes} min`;
 };
 
-const getManeuverIconName = (maneuver) => {
+const getManeuverIconName = (maneuver: string): string => {
   const normalized = String(maneuver || '').toLowerCase();
   if (normalized.includes('left')) return 'arrow-undo';
   if (normalized.includes('right')) return 'arrow-redo';
@@ -137,40 +186,40 @@ export default function OutdoorTracker() {
   const dispatch = useDispatch();
   const label = Array.isArray(params?.label) ? params.label[0] : params?.label || 'Outdoor';
   const type = Array.isArray(params?.type) ? params.type[0] : params?.type || 'cardio';
-  const icon = Array.isArray(params?.icon) ? params.icon[0] : params?.icon || 'navigate';
+  const icon = (Array.isArray(params?.icon) ? params.icon[0] : params?.icon || 'navigate') as any;
   const caloriesPerMinute = toNumber(Array.isArray(params?.caloriesPerMinute) ? params.caloriesPerMinute[0] : params?.caloriesPerMinute, 8);
   const { height: windowHeight } = useWindowDimensions();
   const isShortScreen = windowHeight < 780;
 
   const [permissionState, setPermissionState] = useState('checking');
   const [trackerError, setTrackerError] = useState('');
-  const [currentFix, setCurrentFix] = useState(null);
-  const [routePoints, setRoutePoints] = useState([]);
+  const [currentFix, setCurrentFix] = useState<LocationPoint | null>(null);
+  const [routePoints, setRoutePoints] = useState<LocationPoint[]>([]);
   const [distanceMeters, setDistanceMeters] = useState(0);
   const [trackingState, setTrackingState] = useState('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
   const [hasSavedSession, setHasSavedSession] = useState(false);
   const [followUser, setFollowUser] = useState(true);
-  const [destinationPoints, setDestinationPoints] = useState([]);
+  const [destinationPoints, setDestinationPoints] = useState<{ latitude: number; longitude: number }[]>([]);
   const [destinationMode, setDestinationMode] = useState(false);
   const [recenterSignal, setRecenterSignal] = useState(0);
   const [elevationGainMeters, setElevationGainMeters] = useState(0);
   const [currentSpeedMps, setCurrentSpeedMps] = useState(0);
   const [mapReady, setMapReady] = useState(Platform.OS !== 'web');
   const [routeLoading, setRouteLoading] = useState(false);
-  const [plannedRoute, setPlannedRoute] = useState(null);
+  const [plannedRoute, setPlannedRoute] = useState<PlannedRoute | null>(null);
   const [sheetSnapIndex, setSheetSnapIndex] = useState(1);
   const [destinationQuery, setDestinationQuery] = useState('');
-  const [placeSuggestions, setPlaceSuggestions] = useState([]);
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
   const [placeSearchLoading, setPlaceSearchLoading] = useState(false);
   const [placeSearchError, setPlaceSearchError] = useState('');
-  const [finishSummary, setFinishSummary] = useState(null);
+  const [finishSummary, setFinishSummary] = useState<FinishSummary | null>(null);
 
-  const watchRef = useRef(null);
-  const liveStartRef = useRef(null);
+  const watchRef = useRef<Location.LocationSubscription | null>(null);
+  const liveStartRef = useRef<number | null>(null);
   const pausedElapsedRef = useRef(0);
-  const lastPointRef = useRef(null);
-  const lastRouteOriginRef = useRef(null);
+  const lastPointRef = useRef<LocationPoint | null>(null);
+  const lastRouteOriginRef = useRef<LocationPoint | null>(null);
   const lastRouteSignatureRef = useRef('');
   const routeRequestIdRef = useRef(0);
   const sheetTranslateRef = useRef(new Animated.Value(0));
@@ -198,7 +247,7 @@ export default function OutdoorTracker() {
     return [collapsed, mid, 0];
   }, [collapsedSheetHeight, expandedSheetHeight, midSheetHeight]);
 
-  const animateSheetToIndex = useCallback((nextIndex) => {
+  const animateSheetToIndex = useCallback((nextIndex: number) => {
     const clampedIndex = clamp(nextIndex, 0, sheetSnapOffsets.length - 1);
     const nextValue = sheetSnapOffsets[clampedIndex];
     sheetOffsetRef.current = nextValue;
@@ -247,8 +296,8 @@ export default function OutdoorTracker() {
   }), [animateSheetToIndex, sheetSnapIndex, sheetSnapOffsets]);
 
   useEffect(() => {
-    if (Platform.OS === 'web' && mapReady && globalThis.google?.maps?.places?.AutocompleteSessionToken) {
-      placeSessionTokenRef.current = new globalThis.google.maps.places.AutocompleteSessionToken();
+    if (Platform.OS === 'web' && mapReady && (globalThis as any).google?.maps?.places?.AutocompleteSessionToken) {
+      placeSessionTokenRef.current = new (globalThis as any).google.maps.places.AutocompleteSessionToken();
       return;
     }
 
@@ -289,14 +338,14 @@ export default function OutdoorTracker() {
       setRoutePoints((points) => (points.length > 0 ? points : [initialPoint]));
       lastPointRef.current = initialPoint;
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       setPermissionState('denied');
-      setTrackerError(String(error?.message || error));
+      setTrackerError(String((error as Error)?.message || error));
       return false;
     }
   }, []);
 
-  const handleLocationUpdate = useCallback((location) => {
+  const handleLocationUpdate = useCallback((location: Location.LocationObject) => {
     const nextPoint = {
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
@@ -320,8 +369,8 @@ export default function OutdoorTracker() {
       const elapsedSeconds = Math.max(1, ((nextPoint.timestamp || Date.now()) - (previousPoint.timestamp || Date.now())) / 1000);
       setDistanceMeters((value) => value + segmentMeters);
       setCurrentSpeedMps(
-        Number.isFinite(nextPoint.speed) && nextPoint.speed > 0
-          ? nextPoint.speed
+        Number.isFinite(nextPoint.speed) && (nextPoint.speed ?? 0) > 0
+          ? (nextPoint.speed ?? 0)
           : segmentMeters / elapsedSeconds
       );
 
@@ -330,7 +379,7 @@ export default function OutdoorTracker() {
         setElevationGainMeters((value) => value + altitudeDelta);
       }
     } else {
-      setCurrentSpeedMps(Number.isFinite(nextPoint.speed) && nextPoint.speed > 0 ? nextPoint.speed : 0);
+      setCurrentSpeedMps(Number.isFinite(nextPoint.speed) && (nextPoint.speed ?? 0) > 0 ? (nextPoint.speed ?? 0) : 0);
     }
 
     lastPointRef.current = nextPoint;
@@ -415,7 +464,7 @@ export default function OutdoorTracker() {
     animateSheetToIndex(1);
   }, [animateSheetToIndex, currentFix, stopWatching]);
 
-  const handleMapPress = useCallback((point) => {
+  const handleMapPress = useCallback((point: { latitude: number; longitude: number } | null) => {
     if (!destinationMode || !point) return;
 
     setDestinationPoints((points) => [...points, point]);
@@ -457,7 +506,7 @@ export default function OutdoorTracker() {
     setPlaceSearchError('');
   }, []);
 
-  const handleSelectSuggestion = useCallback(async (suggestion) => {
+  const handleSelectSuggestion = useCallback(async (suggestion: PlaceSuggestion) => {
     if (!suggestion?.id) return;
 
     setPlaceSearchLoading(true);
@@ -480,8 +529,8 @@ export default function OutdoorTracker() {
       setDestinationMode(false);
       setFollowUser(false);
       animateSheetToIndex(1);
-    } catch (error) {
-      setPlaceSearchError(error?.message || 'Unable to select destination.');
+    } catch (error: unknown) {
+      setPlaceSearchError((error as Error)?.message || 'Unable to select destination.');
     } finally {
       setPlaceSearchLoading(false);
     }
@@ -514,7 +563,7 @@ export default function OutdoorTracker() {
     setFinishSummary({
       date: dateKey,
       session: sessionRecord,
-      xp: Math.max(0, Math.floor(Number(sessionRecord.awardedXP) || 0)),
+      xp: Math.max(0, Math.floor((sessionRecord as any).awardedXP || 0)),
       distanceKm,
       durationMin,
       calories: sessionRecord.calories,
@@ -549,7 +598,7 @@ export default function OutdoorTracker() {
         title: 'My Bodify workout',
         message: shareMessage,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(shareMessage);
@@ -558,7 +607,7 @@ export default function OutdoorTracker() {
         } catch (_) {}
       }
 
-      setTrackerError(error?.message || 'Unable to share workout summary.');
+      setTrackerError((error as Error)?.message || 'Unable to share workout summary.');
     }
   }, [finishSummary, label]);
 
@@ -628,7 +677,7 @@ export default function OutdoorTracker() {
     const timeoutId = setTimeout(async () => {
       setRouteLoading(true);
       try {
-        const route = await fetchGoogleRoute({
+        const route = await (fetchGoogleRoute as any)({
           origin: currentFix,
           destination: destinationPoint,
           waypoints: routeWaypoints,
@@ -636,12 +685,12 @@ export default function OutdoorTracker() {
         });
 
         if (cancelled || routeRequestIdRef.current !== requestId) return;
-        setPlannedRoute(route);
+        setPlannedRoute(route as unknown as PlannedRoute);
         lastRouteOriginRef.current = currentFix;
         lastRouteSignatureRef.current = destinationSignature;
       } catch (error) {
         if (cancelled || routeRequestIdRef.current !== requestId) return;
-        setPlannedRoute((previousValue) => previousValue ? { ...previousValue, error: error?.message || 'Unable to load route.' } : null);
+        setPlannedRoute((previousValue) => previousValue ? { ...previousValue, error: (error as Error)?.message || 'Unable to load route.' } : null);
       } finally {
         if (!cancelled && routeRequestIdRef.current === requestId) {
           setRouteLoading(false);
@@ -685,7 +734,7 @@ export default function OutdoorTracker() {
       } catch (error) {
         if (cancelled || placeRequestIdRef.current !== requestId) return;
         setPlaceSuggestions([]);
-        setPlaceSearchError(error?.message || 'Unable to search destinations.');
+        setPlaceSearchError((error as Error)?.message || 'Unable to search destinations.');
       } finally {
         if (!cancelled && placeRequestIdRef.current === requestId) {
           setPlaceSearchLoading(false);
@@ -713,7 +762,7 @@ export default function OutdoorTracker() {
     ? `${currentFix.latitude.toFixed(5)}, ${currentFix.longitude.toFixed(5)}`
     : 'Waiting for location';
   const destinationDistanceMeters = currentFix && destinationPoint
-    ? getDistanceInMeters(currentFix, destinationPoint)
+    ? getDistanceInMeters(currentFix, destinationPoint as LocationPoint)
     : 0;
   const mapOverlayTitle = destinationMode
     ? 'Tap the map to pin a destination'
@@ -743,7 +792,7 @@ export default function OutdoorTracker() {
   const liveSpeedLabel = formatSpeed(currentSpeedMps || averageSpeedMps);
   const averageSpeedLabel = formatSpeed(averageSpeedMps);
   const elevationLabel = formatElevation(elevationGainMeters);
-  const etaLabel = formatEta(plannedRoute?.durationSec);
+  const etaLabel = formatEta(plannedRoute?.durationSec ?? 0);
   const routeDistanceLabel = plannedRoute?.distanceMeters ? formatRemainingDistance(plannedRoute.distanceMeters) : destinationSummary;
   const routeSteps = plannedRoute?.steps || [];
   const gpsStatusCompact = permissionState === 'granted' ? accuracyLabel : 'Off';
@@ -967,11 +1016,11 @@ export default function OutdoorTracker() {
                     {routeSteps.map((step, index) => (
                       <View key={step.id || `${index}`} style={styles.routeStepRow}>
                         <View style={styles.routeStepIndex}>
-                          <Ionicons name={getManeuverIconName(step.maneuver)} size={14} color="#ffffff" />
+                          <Ionicons name={getManeuverIconName(step.maneuver ?? '') as any} size={14} color="#ffffff" />
                         </View>
                         <View style={styles.routeStepCopy}>
                           <Text style={styles.routeStepInstruction}>{step.instruction}</Text>
-                          <Text style={styles.routeStepMeta}>{formatRemainingDistance(step.distanceMeters)} · {formatEta(step.durationSec)}</Text>
+                          <Text style={styles.routeStepMeta}>{formatRemainingDistance(step.distanceMeters ?? 0)} · {formatEta(step.durationSec ?? 0)}</Text>
                         </View>
                       </View>
                     ))}

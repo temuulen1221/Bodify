@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import ErrorBoundary from '../components/ErrorBoundary';
 import InteractiveAvatar from '../components/InteractiveAvatar';
 import { IDLE_LOOP_ANIMATION_OPTIONS, RECOMMENDED_FBX_ANIMATION_OPTIONS } from '../utils/avatarAnimationConfig';
 
@@ -257,6 +258,7 @@ export default function AvatarWebScreen() {
         <>
           <Text style={styles.subtleLabel}>Interactive avatar resting state: {activeIdleLabel}</Text>
           <View style={styles.interactiveContainer}>
+            <ErrorBoundary fallbackMessage="Avatar failed to load. Tap to retry.">
             <InteractiveAvatarComponent
               gender={DEFAULT_PROFILE.gender}
               height={DEFAULT_PROFILE.height}
@@ -274,6 +276,7 @@ export default function AvatarWebScreen() {
               enableTTS={true}
               onInteraction={handleAvatarInteraction}
             />
+            </ErrorBoundary>
           </View>
 
           {/* Interaction Log */}

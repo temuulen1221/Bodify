@@ -12,7 +12,7 @@ import { buildBadgeData, getActiveBadgeConfig } from '../utils/badgeSystem';
 
 const SOCIAL_COLLECTION = 'socialPosts';
 
-const formatTime = (value) => {
+const formatTime = (value: any) => {
   if (!value) return 'Just now';
   const timestamp = value?.toDate ? value.toDate() : new Date(value);
   if (Number.isNaN(timestamp.getTime())) return 'Just now';
@@ -26,7 +26,7 @@ const formatTime = (value) => {
   return `${days}d ago`;
 };
 
-const mapPost = (snap) => {
+const mapPost = (snap: any) => {
   const data = snap.data() || {};
   return {
     id: snap.id,
@@ -44,7 +44,7 @@ const mapPost = (snap) => {
   };
 };
 
-function SocialPostMini({ post }) {
+function SocialPostMini({ post }: { post: any }) {
   return (
     <View style={styles.postCard}>
       <View style={styles.postTopRow}>
@@ -86,15 +86,15 @@ function SocialPostMini({ post }) {
 }
 
 export default function SocialProfileScreen() {
-  const user = useSelector((state) => state.user || {});
+  const user = useSelector((state: any) => state.user || {});
   const avatarName = user?.avatarName || 'Player';
   const level = user?.level || 1;
   const photoUri = user?.photoUri || '';
   const activeBadgeKey = user?.selectedBadgeKey || null;
-  const stepsByDate = useSelector((state) => state.steps?.stepsByDate || {});
-  const sessionsByDate = useSelector((state) => state.workouts?.sessionsByDate || {});
-  const [uid, setUid] = useState(null);
-  const [allPosts, setAllPosts] = useState([]);
+  const stepsByDate = useSelector((state: any) => state.steps?.stepsByDate || {});
+  const sessionsByDate = useSelector((state: any) => state.workouts?.sessionsByDate || {});
+  const [uid, setUid] = useState<string | null>(null);
+  const [allPosts, setAllPosts] = useState<any[]>([]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -140,7 +140,7 @@ export default function SocialProfileScreen() {
   const { badgeConfigs } = useMemo(() => buildBadgeData({ user, stepsByDate, sessionsByDate }), [user, stepsByDate, sessionsByDate]);
   const selectedBadge = getActiveBadgeConfig(badgeConfigs, activeBadgeKey) || badgeConfigs[0];
   const selectedBadgeTheme = useMemo(() => {
-    const tone = compactBadgePalette[selectedBadge?.tone]?.color || compactBadgePalette.cyan.color;
+    const tone = (compactBadgePalette as any)[selectedBadge?.tone]?.color || compactBadgePalette.cyan.color;
     return {
       tone,
       pageGlow: `${tone}12`,

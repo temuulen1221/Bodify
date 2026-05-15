@@ -15,21 +15,21 @@ import { setProfile } from '../store';
 import { COLORS } from '../utils/constants';
 import { getLevelAccent } from '../utils/levelAccent';
 
-const getDateKey = (date) => {
+const getDateKey = (date: any) => {
   const current = date instanceof Date ? date : new Date(date);
   return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
 };
 
-const formatNumber = (value) => Number(value || 0).toLocaleString();
+const formatNumber = (value: any) => Number(value || 0).toLocaleString();
 
-const formatDateLabel = (value) => {
+const formatDateLabel = (value: any) => {
   if (!value) return 'No workout logged';
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-const getBmiCategory = (bmi) => {
+const getBmiCategory = (bmi: any) => {
   if (!Number.isFinite(bmi)) return 'Add height and weight';
   if (bmi < 18.5) return 'Underweight';
   if (bmi < 25) return 'Healthy range';
@@ -37,12 +37,12 @@ const getBmiCategory = (bmi) => {
   return 'Obesity range';
 };
 
-const formatBodyShape = (value) => {
+const formatBodyShape = (value: any) => {
   if (!value) return 'Not set';
   return value.charAt(0).toUpperCase() + value.slice(1);
 };
 
-const formatSignedValue = (value, suffix = '') => {
+const formatSignedValue = (value: any, suffix = '') => {
   if (!Number.isFinite(value)) return 'No data';
   if (value === 0) return `0${suffix}`;
   return `${value > 0 ? '+' : ''}${value}${suffix}`;
@@ -51,7 +51,7 @@ const formatSignedValue = (value, suffix = '') => {
 const BODY_SHAPE_OPTIONS = ['athletic', 'lean', 'balanced', 'muscular'];
 const GENDER_OPTIONS = ['male', 'female', 'non-binary', 'prefer not to say'];
 
-const getLatestWorkoutDate = (sessionsByDate = {}) => {
+const getLatestWorkoutDate = (sessionsByDate: Record<string, any> = {}) => {
   return Object.keys(sessionsByDate)
     .filter((key) => Array.isArray(sessionsByDate[key]) && sessionsByDate[key].length > 0)
     .sort()
@@ -63,9 +63,9 @@ const ProfileScreen = () => {
   const dispatch = useDispatch();
   const [analysisMode, setAnalysisMode] = useState('weekly');
   const [profileView, setProfileView] = useState('overview');
-  const user = useSelector((state) => state.user || {});
-  const stepsByDate = useSelector((state) => state.steps?.stepsByDate || {});
-  const sessionsByDate = useSelector((state) => state.workouts?.sessionsByDate || {});
+  const user = useSelector((state: any) => state.user || {});
+  const stepsByDate = useSelector((state: any) => state.steps?.stepsByDate || {});
+  const sessionsByDate = useSelector((state: any) => state.workouts?.sessionsByDate || {});
   const {
     avatarName,
     height,
@@ -112,7 +112,7 @@ const ProfileScreen = () => {
         const snapshot = await getDoc(ref);
         if (!snapshot.exists()) return;
         const data = snapshot.data() || {};
-        dispatch(setProfile({
+        dispatch((setProfile as any)({
           avatarName: data.avatarName ?? avatarName,
           height: data.height ?? height,
           weight: data.weight ?? weight,
@@ -151,7 +151,7 @@ const ProfileScreen = () => {
 
   const todayKey = useMemo(() => getDateKey(new Date()), []);
   const movementMetrics = useMemo(() => {
-    const totalSteps = Object.values(stepsByDate).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    const totalSteps = Object.values(stepsByDate).reduce((sum: any, value: any) => sum + (Number(value) || 0), 0);
     let weekSteps = 0;
     let monthSteps = 0;
     let activeDays7d = 0;
@@ -208,7 +208,7 @@ const ProfileScreen = () => {
       monthSessions += sessions.length;
       if (i < 7) {
         weekSessions += sessions.length;
-        sessions.forEach((session) => {
+        sessions.forEach((session: any) => {
           weekCalories += Number(session?.calories) || 0;
           weekDuration += Number(session?.durationMin) || 0;
         });
@@ -1430,6 +1430,43 @@ const styles = StyleSheet.create({
     color: '#F7FBFF',
     fontSize: 13,
     fontWeight: '800',
+  },
+  heroNameInput: {
+    flex: 1,
+    color: '#E8F9FF',
+    fontSize: 16,
+    paddingVertical: 8,
+  },
+  heroEditActions: {
+    flexDirection: 'row' as const,
+    gap: 8,
+    marginTop: 12,
+  },
+  metricInput: {
+    flex: 1,
+    color: '#E8F9FF',
+    fontSize: 15,
+    paddingVertical: 8,
+  },
+  choiceRowCompact: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 6,
+    marginTop: 4,
+  },
+  choiceChipCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  goalInput: {
+    flex: 1,
+    color: '#E8F9FF',
+    fontSize: 15,
+    paddingVertical: 8,
   },
 });
 

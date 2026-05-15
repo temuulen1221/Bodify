@@ -10,7 +10,7 @@ import { resolveAvatarModelSelection } from '../utils/avatarModels';
  * Shows conversation, emotion detection, and dynamic animations
  */
 export default function AIAvatarDemo() {
-  const user = useSelector((state) => state.user || {});
+  const user = useSelector((state: any) => state.user || {});
   const selectedGender = String(user.gender || 'male');
   const selectedHeight = String(user.height || '175');
   const selectedWeight = String(user.weight || '70');
@@ -39,12 +39,12 @@ export default function AIAvatarDemo() {
 
   const [userInput, setUserInput] = useState('');
   const [selectedPersonality, setSelectedPersonality] = useState('friendly_coach');
-  const scrollViewRef = useRef(null);
-  const avatarRef = useRef(null);
+  const scrollViewRef = useRef<any>(null);
+  const avatarRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!latestAiOutcome?.workoutDemo) return;
-    avatarRef.current?.triggerWorkoutDemo?.(latestAiOutcome.workoutDemo);
+    if (!(latestAiOutcome as any)?.workoutDemo) return;
+    avatarRef.current?.triggerWorkoutDemo?.((latestAiOutcome as any).workoutDemo);
   }, [latestAiOutcome]);
 
   const handleSendMessage = async () => {
@@ -54,7 +54,7 @@ export default function AIAvatarDemo() {
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 300);
   };
 
-  const handleQuickAction = async (action) => {
+  const handleQuickAction = async (action: any) => {
     switch (action) {
       case 'workout':
         await getWorkoutAdvice('pushups');
@@ -72,7 +72,7 @@ export default function AIAvatarDemo() {
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 300);
   };
 
-  const handlePersonalityChange = (personality) => {
+  const handlePersonalityChange = (personality: any) => {
     setSelectedPersonality(personality);
     setPersonality(personality);
   };
@@ -82,7 +82,7 @@ export default function AIAvatarDemo() {
       {/* Avatar Section */}
       <View style={styles.avatarSection}>
         <InteractiveAvatar
-          ref={avatarRef}
+          {...{ ref: avatarRef } as any}
           model={selectedModel}
           gender={selectedGender}
           height={selectedHeight}
@@ -159,13 +159,13 @@ export default function AIAvatarDemo() {
           </View>
         )}
 
-        {conversationHistory.length === 0 ? (
+        {(conversationHistory as any[]).length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>👋 Start a conversation!</Text>
             <Text style={styles.emptyStateSubtext}>Tap a quick action or type a message</Text>
           </View>
         ) : (
-          conversationHistory.map((item, idx) => (
+          (conversationHistory as any[]).map((item, idx) => (
             <View
               key={idx}
               style={[
@@ -183,7 +183,7 @@ export default function AIAvatarDemo() {
           ))
         )}
 
-        {aiResponse && !conversationHistory.some(m => m.message === aiResponse) && (
+        {aiResponse && !(conversationHistory as any[]).some((m: any) => m.message === aiResponse) && (
           <View style={styles.aiMessage}>
             <Text style={styles.messageText}>{aiResponse}</Text>
             <Text style={styles.emotionTag}>{currentEmotion}</Text>

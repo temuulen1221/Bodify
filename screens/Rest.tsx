@@ -25,16 +25,16 @@ const RECOVERY_MODES = [
   { id: 'deep-recovery', label: '10 min', subtitle: 'Deep recovery', minutes: 10 },
 ];
 
-const formatTime = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+const formatTime = (value: number) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 
 export default function Rest() {
   const insets = useSafeAreaInsets();
   const [selectedModeId, setSelectedModeId] = useState('full-reset');
   const [timer, setTimer] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [actions, setActions] = useState(RECOVERY_ACTIONS);
+  const [actions, setActions] = useState<Array<{ id: string; title: string; detail: string; done?: boolean }>>(RECOVERY_ACTIONS);
   const breathAnim = useRef(new Animated.Value(1)).current;
-  const intervalRef = useRef(null);
+  const intervalRef = useRef<any>(null);
 
   const selectedMode = useMemo(
     () => RECOVERY_MODES.find((mode) => mode.id === selectedModeId) || RECOVERY_MODES[1],
@@ -87,13 +87,13 @@ export default function Rest() {
     return () => loop.stop();
   }, [breathAnim]);
 
-  const toggleAction = (actionId) => {
+  const toggleAction = (actionId: any) => {
     setActions((current) => current.map((action) => (
       action.id === actionId ? { ...action, done: !action.done } : action
     )));
   };
 
-  const handleSelectMode = (modeId) => {
+  const handleSelectMode = (modeId: any) => {
     setSelectedModeId(modeId);
     setTimer(0);
     setIsRunning(false);

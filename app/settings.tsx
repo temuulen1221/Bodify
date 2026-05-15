@@ -7,7 +7,7 @@ import ScreenFrame from '../components/ScreenFrame';
 import { getLocationPermissionStatus, requestLocationPermission } from '../services/locationPermissions';
 import { getMediaPermissionsStatus, requestMediaPermissions } from '../services/mediaPermissions';
 
-const formatPermissionLabel = (value) => {
+const formatPermissionLabel = (value: any) => {
   switch (String(value || '').toLowerCase()) {
     case 'granted':
       return 'Granted';
@@ -56,7 +56,7 @@ export default function SettingsScreen() {
         locationRequestedBefore: locationResult.requestedBefore,
         locationCanAskAgain: locationResult.canAskAgain,
         locationError: locationResult.error || '',
-      });
+      } as any);
       setPermissionsLoading(false);
     };
 
@@ -78,7 +78,7 @@ export default function SettingsScreen() {
       locationRequestedBefore: locationResult.requestedBefore,
       locationCanAskAgain: locationResult.canAskAgain,
       locationError: locationResult.error || '',
-    });
+    } as any);
     setPermissionsRefreshing(false);
   };
 
@@ -94,7 +94,7 @@ export default function SettingsScreen() {
       locationRequestedBefore: locationResult.requestedBefore,
       locationCanAskAgain: locationResult.canAskAgain,
       locationError: locationResult.error || '',
-    });
+    } as any);
     setPermissionsRefreshing(false);
   };
 

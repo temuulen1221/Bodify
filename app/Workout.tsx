@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import ScreenFrame from '../components/ScreenFrame';
 import WorkoutScreen from '../screens/Workout';
 
-function resolveAiPlanRaw(aiPlanParam) {
+function resolveAiPlanRaw(aiPlanParam: any) {
 	const webWorkoutPlanStorageKey = 'bodify:web-workout-plan';
 	const aiPlanFromQuery = typeof window !== 'undefined'
 		? new URLSearchParams(window.location.search).get('aiPlan') || ''

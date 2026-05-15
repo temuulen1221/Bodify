@@ -11,6 +11,56 @@ const GOOGLE_TTS_API_KEY = process.env.GOOGLE_TTS_API_KEY || process.env.GOOGLE_
 const GOOGLE_TTS_DEFAULT_VOICE_NAME = process.env.GOOGLE_TTS_DEFAULT_VOICE_NAME || 'en-US-Neural2-F';
 const GOOGLE_TTS_DEFAULT_LANGUAGE_CODE = process.env.GOOGLE_TTS_DEFAULT_LANGUAGE_CODE || 'en-US';
 
+// Rate limiting — sliding window (in-memory, resets on process restart)
+const RATE_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_PER_IP = Number(process.env.TTS_RATE_LIMIT_PER_IP || 30);   // requests per IP per minute
+const RATE_LIMIT_GLOBAL = Number(process.env.TTS_RATE_LIMIT_GLOBAL || 120);  // total requests per minute
+
+/** @type {Map<string, number[]>} IP → array of request timestamps */
+const ipWindows = new Map();
+/** @type {number[]} global request timestamps */
+const globalWindow = [];
+
+function pruneWindow(timestamps) {
+  const cutoff = Date.now() - RATE_WINDOW_MS;
+  let i = 0;
+  while (i < timestamps.length && timestamps[i] < cutoff) i++;
+  if (i > 0) timestamps.splice(0, i);
+}
+
+/**
+ * Returns true if the request should be rate-limited.
+ * @param {string} ip
+ */
+function isRateLimited(ip) {
+  const now = Date.now();
+
+  // Global window
+  pruneWindow(globalWindow);
+  if (globalWindow.length >= RATE_LIMIT_GLOBAL) return true;
+
+  // Per-IP window
+  if (!ipWindows.has(ip)) ipWindows.set(ip, []);
+  const ipWindow = ipWindows.get(ip);
+  pruneWindow(ipWindow);
+  if (ipWindow.length >= RATE_LIMIT_PER_IP) return true;
+
+  // Admit the request
+  globalWindow.push(now);
+  ipWindow.push(now);
+  return false;
+}
+
+// Periodically clean up stale IP entries to avoid memory growth
+setInterval(() => {
+  const cutoff = Date.now() - RATE_WINDOW_MS;
+  for (const [ip, timestamps] of ipWindows.entries()) {
+    if (!timestamps.length || timestamps[timestamps.length - 1] < cutoff) {
+      ipWindows.delete(ip);
+    }
+  }
+}, RATE_WINDOW_MS * 2).unref();
+
 function clamp(value, min, max, fallback) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -124,6 +174,11 @@ async function handleGoogleTts(req, res) {
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`);
 
+  // Resolve client IP (trust X-Forwarded-For only if explicitly configured)
+  const clientIp = (process.env.TTS_TRUST_PROXY === '1'
+    ? String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    : '') || req.socket?.remoteAddress || 'unknown';
+
   if (req.method === 'OPTIONS') {
     setCors(res);
     res.statusCode = 204;
@@ -142,6 +197,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (requestUrl.pathname === '/google-tts' && req.method === 'POST') {
+    if (isRateLimited(clientIp)) {
+      sendJson(res, 429, { error: 'Too many requests. Please slow down.' });
+      return;
+    }
     await handleGoogleTts(req, res);
     return;
   }
@@ -153,6 +212,7 @@ server.listen(PORT, HOST, () => {
   console.log(`[tts-proxy] Listening at http://${HOST}:${PORT}`);
   console.log('[tts-proxy] POST /google-tts');
   console.log('[tts-proxy] GET  /health');
+  console.log(`[tts-proxy] Rate limits: ${RATE_LIMIT_PER_IP} req/min per IP, ${RATE_LIMIT_GLOBAL} req/min global`);
   if (!GOOGLE_TTS_API_KEY) {
     console.warn('[tts-proxy] GOOGLE_TTS_API_KEY is missing in .env');
   }
