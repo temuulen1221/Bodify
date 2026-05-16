@@ -419,7 +419,6 @@ const HomeScreen = () => {
     resetConversation,
   } = useAIAvatar({
     personality: 'friendly_coach',
-    preferDirectGemini: true,
     userName: avatarName || 'User',
     gender: String(gender || 'male'),
     height: String(height || '175'),

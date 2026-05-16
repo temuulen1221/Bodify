@@ -60,6 +60,9 @@ pnpm-debug.*
 .env
 .env*.local
 
+# Firebase config (contains private keys — never commit)
+GoogleService-Info.plist
+
 # typescript
 *.tsbuildinfo
 

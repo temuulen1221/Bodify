@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 const DEFAULT_DELTA = 0.01;
@@ -46,6 +46,7 @@ export default function OutdoorLiveMap({
   onMapReady,
 }) {
   const mapRef = useRef(null);
+  const provider = Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
   const region = useMemo(() => getRegionFromPoints(routePoints, currentFix), [routePoints, currentFix]);
   const markerPoint = currentFix || routePoints[routePoints.length - 1] || null;
 
@@ -102,7 +103,7 @@ export default function OutdoorLiveMap({
     <View style={[styles.wrapper, style]}>
       <MapView
         ref={mapRef}
-        provider={PROVIDER_GOOGLE}
+        provider={provider}
         style={styles.map}
         initialRegion={region}
         mapPadding={{ top: 24, right: 24, bottom: 24, left: 24 }}
@@ -111,7 +112,7 @@ export default function OutdoorLiveMap({
         rotateEnabled={false}
         pitchEnabled={false}
         toolbarEnabled={false}
-        customMapStyle={MAP_STYLE}
+        customMapStyle={provider ? MAP_STYLE : undefined}
         onPress={(event) => onMapPress?.(event.nativeEvent.coordinate)}
         onMapReady={onMapReady}
       >

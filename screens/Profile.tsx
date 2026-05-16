@@ -11,6 +11,7 @@ import MonthlyStepsChart from '../components/MonthlyStepsChart';
 import WeeklyStepsChart from '../components/WeeklyStepsChart';
 import WeeklyWorkoutsChart from '../components/WeeklyWorkoutsChart';
 import { auth, db } from '../services/firebase';
+import { clearUserState } from '../services/storage';
 import { setProfile } from '../store';
 import { COLORS } from '../utils/constants';
 import { getLevelAccent } from '../utils/levelAccent';
@@ -796,7 +797,7 @@ const ProfileScreen = () => {
 
         <TouchableOpacity
           style={styles.signOutButton}
-          onPress={() => signOut(auth)}
+          onPress={async () => { await clearUserState(); signOut(auth); }}
           activeOpacity={0.75}
         >
           <Text style={styles.signOutText}>Sign Out</Text>

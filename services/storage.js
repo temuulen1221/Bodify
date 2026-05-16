@@ -101,8 +101,16 @@ export async function loadUserState() {
     const s = await AsyncStorage.getItem(USER_KEY);
     if (!s) return null;
     const parsed = JSON.parse(s);
-    // Basic validation
-    if (parsed && typeof parsed === 'object') return parsed;
+    if (parsed && typeof parsed === 'object') {
+      // Discard cache if it belongs to a different user.
+      // _uid is written by saveUserState; old entries without it pass through.
+      const currentUid = auth.currentUser?.uid;
+      if (currentUid && parsed._uid && parsed._uid !== currentUid) {
+        await AsyncStorage.removeItem(USER_KEY);
+        return null;
+      }
+      return parsed;
+    }
     return null;
   } catch (err) {
     console.warn('[storage] loadUserState failed', err);
@@ -113,7 +121,9 @@ export async function loadUserState() {
 export async function saveUserState(user) {
   try {
     const subset = buildPersistedUserSubset(user);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(subset));
+    // Tag with current UID so loadUserState can discard stale cross-user cache.
+    const uid = auth.currentUser?.uid ?? null;
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify({ ...subset, _uid: uid }));
   } catch (err) {
     console.warn('[storage] saveUserState failed', err);
   }

@@ -1,4 +1,3 @@
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import Constants from 'expo-constants';
@@ -17,6 +16,19 @@ import { COLORS, GRADIENTS } from '../utils/constants';
 const DEFAULT_LEVEL_CAP = 100;
 
 WebBrowser.maybeCompleteAuthSession();
+
+// Lazy-load @react-native-google-signin/google-signin to avoid crashing in Expo Go,
+// where the native TurboModule 'RNGoogleSignin' does not exist.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const getGoogleSignin = (): any => {
+  if (Constants?.appOwnership === 'expo') return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('@react-native-google-signin/google-signin').GoogleSignin;
+  } catch {
+    return null;
+  }
+};
 
 const persistGoogleUser = async (signedInUser: User) => {
   if (!signedInUser?.uid) return;
@@ -115,37 +127,48 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Use system browser except inside Expo Go
   const isExpoGo = Constants?.appOwnership === 'expo';
+  const appExtra = (Constants.expoConfig?.extra || {}) as Record<string, string | undefined>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const redirectUri = makeRedirectUri((isExpoGo
-    ? { useProxy: true, scheme: 'bodify' }
-    : Platform.OS === 'web'
-      ? { scheme: 'bodify' }
-      : { native: 'bodify://redirect', scheme: 'bodify', path: 'redirect' }) as any);
+  const redirectUri = makeRedirectUri((Platform.OS === 'web'
+    ? { scheme: 'bodify' }
+    : { native: 'bodify://redirect', scheme: 'bodify', path: 'redirect' }) as any);
 
-  const googleClientIds = {
-    // webClientId is from Firebase project 351839980449 (bodify-37337)
-    webClientId: '351839980449-tmdig61k3mom0b5rpnncsg149hvb0da9.apps.googleusercontent.com',
-    // androidClientId omitted: was from a different GCP project (395792534119) and caused
-    // DEVELOPER_ERROR. The browser-based PKCE fallback uses webClientId instead.
-  };
+  const webClientId = appExtra.googleWebClientId || process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '351839980449-tmdig61k3mom0b5rpnncsg149hvb0da9.apps.googleusercontent.com';
+  const androidClientId = appExtra.googleAndroidClientId || process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || undefined;
+  const iosClientId = appExtra.googleIosClientId || process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined;
+
+  // In Expo Go: use the generic `clientId` key so expo-auth-session uses the web OAuth client.
+  // The library selects by platform (iosClientId/androidClientId) and throws if that key is missing,
+  // BUT it falls back to `clientId` before the invariant check — so passing `clientId` bypasses
+  // the native-ID requirement while still using the web client, which supports the proxy redirect.
+  // In real builds: pass all platform-specific IDs so the correct native OAuth flow is used.
+  const googleClientIds = isExpoGo
+    ? { clientId: webClientId }
+    : {
+        webClientId,
+        ...(androidClientId ? { androidClientId } : {}),
+        ...(iosClientId ? { iosClientId } : {}),
+      };
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     ...googleClientIds,
     scopes: ['openid', 'profile', 'email'],
     redirectUri,
-    shouldAutoExchangeCode: Platform.OS !== 'web',
+    // In Expo Go the auth proxy handles the code exchange; auto-exchange breaks the proxy flow.
+    shouldAutoExchangeCode: !isExpoGo && Platform.OS !== 'web',
     selectAccount: true,
   });
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
-
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
+    const GoogleSignin = getGoogleSignin();
+    if (!GoogleSignin) return; // Not available in Expo Go — skip native configure
     GoogleSignin.configure({
-      webClientId: googleClientIds.webClientId,
+      webClientId,
+      ...(iosClientId ? { iosClientId } : {}),
     });
-  }, [googleClientIds.webClientId]);
+  }, [iosClientId, webClientId]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -221,6 +244,15 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogin = async () => {
+    // expo-auth-session removed useProxy in SDK 50; no redirect URI works with Google in Expo Go.
+    // Google Sign-In requires a development build (EAS Build) on iOS/Android.
+    if (isExpoGo) {
+      Alert.alert(
+        'Google Sign-In Unavailable',
+        'Google Sign-In is not supported in Expo Go. Please use email/password, or install a development build to enable Google Sign-In.',
+      );
+      return;
+    }
     try {
       if (Platform.OS === 'web') {
         const provider = new GoogleAuthProvider();
@@ -235,6 +267,8 @@ export default function LoginScreen() {
 
       if (Platform.OS === 'android') {
         try {
+          const GoogleSignin = getGoogleSignin();
+          if (!GoogleSignin) throw Object.assign(new Error('Native Google Sign-In not available'), { code: 'UNAVAILABLE' });
           await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
           const nativeResponse = await GoogleSignin.signIn();
           const googleUser = nativeResponse?.data ?? nativeResponse;
@@ -317,14 +351,16 @@ export default function LoginScreen() {
             </TouchableOpacity>
             {!!error && <Text style={styles.errorText}>{error}</Text>}
             <TouchableOpacity
-              style={styles.googleButton}
+              style={[styles.googleButton, isExpoGo ? { opacity: 0.45 } : null]}
               onPress={handleGoogleLogin}
-              disabled={Platform.OS !== 'web' ? !request : false}
+              disabled={isExpoGo || (Platform.OS !== 'web' ? !request : false)}
               activeOpacity={0.7}
             >
               <View style={styles.googleButtonContent}>
                 <Image source={require('../assets/icons/google.png')} style={styles.googleIcon} />
-                <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                <Text style={styles.googleButtonText}>
+                  {isExpoGo ? 'Google Sign-In (dev build only)' : 'Sign in with Google'}
+                </Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/signup')} style={styles.switchLink}>

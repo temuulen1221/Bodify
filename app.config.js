@@ -12,7 +12,12 @@ export default ({ config }) => ({
     scheme: 'bodify',
     userInterfaceStyle: 'automatic',
     ios: {
+      bundleIdentifier: process.env.IOS_BUNDLE_IDENTIFIER ?? 'com.temuulen1221.bodify',
+      googleServicesFile: './GoogleService-Info.plist',
       supportsTablet: true,
+      config: {
+        googleMapsApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? '',
+      },
       infoPlist: {
         NSCameraUsageDescription:
           'Camera access is needed to perform real-time squat pose detection and count your reps.',
@@ -20,6 +25,14 @@ export default ({ config }) => ({
           '(Optional) Microphone access would allow future voice or sound feedback features.',
         NSLocationWhenInUseUsageDescription:
           'Location access is needed to track live outdoor workouts on the map and verify movement in real time.',
+        // Required for Google Sign-In to redirect back to the app after OAuth
+        CFBundleURLTypes: [
+          {
+            CFBundleURLSchemes: [
+              process.env.REVERSED_CLIENT_ID ?? 'com.googleusercontent.apps.351839980449-j5fem2smh4obdm120sffhrp8ojaci0hq',
+            ],
+          },
+        ],
       },
     },
     android: {
@@ -83,6 +96,9 @@ export default ({ config }) => ({
         process.env.GOOGLE_MAPS_ANDROID_API_KEY
         ?? process.env.GOOGLE_MAPS_API_KEY
         ?? '',
+      googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
+      googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '',
+      googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '',
       googleMapsMapId:
         process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID
         ?? process.env.GOOGLE_MAPS_MAP_ID

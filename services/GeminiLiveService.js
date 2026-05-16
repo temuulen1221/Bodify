@@ -1,9 +1,11 @@
 /**
  * GeminiLiveService - WebSocket client for Gemini Live API (web-first).
- * Uses client API key from Expo env for direct connection.
+ * Uses a dedicated client key (EXPO_PUBLIC_GEMINI_LIVE_API_KEY) for direct
+ * WebSocket connection. This is intentionally separate from the chat API key,
+ * which is stored server-side and accessed via Firebase Functions.
  */
 
-const LIVE_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+const LIVE_API_KEY = process.env.EXPO_PUBLIC_GEMINI_LIVE_API_KEY || '';
 const LIVE_MODEL = process.env.EXPO_PUBLIC_GEMINI_LIVE_MODEL || 'gemini-2.0-flash-live-001';
 const LIVE_VOICE = process.env.EXPO_PUBLIC_GEMINI_LIVE_VOICE || 'Aoede';
 const LIVE_SYSTEM_INSTRUCTION = process.env.EXPO_PUBLIC_GEMINI_LIVE_SYSTEM_INSTRUCTION || [
