@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.png" alt="Bodify app icon" width="100" />
+  <img src="assets/icons/icon/icon/android/mipmap-xxxhdpi/ic_launcher.png" alt="Bodify app icon" width="100" />
 </p>
  # Bodify
 
