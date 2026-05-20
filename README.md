@@ -1,146 +1,155 @@
 <p align="center">
   <img src="assets/icons/icon/icon/android/mipmap-xxxhdpi/ic_launcher.png" alt="Bodify app icon" width="100" />
 </p>
- # Bodify
 
-**Bodify** is an avatar-first fitness game for iOS, Android, and web — built with Expo and React Native. Your 3D avatar reacts to workouts, tracks your progress, and coaches you through missions powered by Google Gemini AI.
+<h1 align="center">Bodify</h1>
 
----
+<p align="center">
+  <strong>Avatar-first fitness for iOS, Android, and web.</strong><br/>
+  Train with a reactive 3D coach, complete missions, and turn real workouts into game-like progression.
+</p>
 
-## Features
+## Overview
 
-| Category | What's included |
+**Bodify** is a gamified fitness app built with Expo and React Native. It combines workout tracking, an AI-powered avatar coach, progression systems, and social mechanics into a single cross-platform experience.
+
+Instead of treating exercise like a static checklist, Bodify makes activity feel interactive: your avatar reacts to workouts, your stats evolve over time, and sessions feed into quests, XP, streaks, and rewards.
+
+## Why Bodify?
+
+- **Avatar-first experience** — a 3D VRM/FBX avatar guides, reacts, and reinforces progress.
+- **AI-powered coaching** — Gemini-backed live coaching with voice support and gesture-aware responses.
+- **Game-style progression** — XP, levels, streaks, badges, quests, unlocks, and rewards.
+- **Multiple fitness modes** — guided reps, pose-aware workouts, and outdoor tracking for cardio activities.
+- **Cross-platform architecture** — one app experience across iOS, Android, and web.
+
+## Feature highlights
+
+| Area | Highlights |
 |---|---|
-| **AI Avatar Coach** | Live Gemini-powered voice coaching, gesture inference, animated VRM/FBX avatar with idle and reaction states |
-| **Workouts** | Guided sessions with rep counting, pose detection (squat/push-up), outdoor modes for running, cycling, and hiking |
-| **Activity Tracking** | Pedometer steps, GPS live map, weekly/monthly charts, Strava integration |
-| **Progression** | XP, leveling, streak tracking, badge system across fitness categories |
-| **Quests & Rewards** | Daily/weekly quests, badge unlocks, reward modals, shop |
-| **Social** | Leaderboard, social profiles, activity feed |
-| **Diet** | Meal search and tracking via Spoonacular API |
-| **Exercise Catalog** | Search and browse exercises via ExerciseDB / RapidAPI |
-| **Battle Replay** | Replay recorded workout sessions as battle animations |
-
----
+| **AI Avatar Coach** | Live Gemini-powered voice coaching, gesture inference, animated avatar states, reactive feedback |
+| **Workouts** | Guided sessions, rep counting, squat/push-up pose detection, outdoor modes for running/cycling/hiking |
+| **Activity Tracking** | Pedometer steps, GPS mapping, weekly/monthly charts, Strava integration |
+| **Progression** | XP, levels, streaks, badge systems, reward loops |
+| **Quests & Rewards** | Daily and weekly quests, unlock flows, reward modals, in-app shop concepts |
+| **Social** | Leaderboards, user profiles, activity feed |
+| **Diet** | Meal lookup and nutrition tracking via Spoonacular |
+| **Exercise Catalog** | Searchable exercise database powered by ExerciseDB / RapidAPI |
+| **Battle Replay** | Replay workout sessions as battle-style animations |
 
 ## Tech stack
 
-- **Expo SDK 52** · Expo Router (file-based routes) · React Native
-- **React 19** · TypeScript · Redux Toolkit
-- **Firebase** (Auth, Firestore, Functions, Storage)
-- **Google Gemini** (Live API + Functions proxy)
-- **Three.js / @pixiv/three-vrm** for 3D avatar rendering
-- **CharacterStudio** — embedded Vite sub-project for avatar customisation
+- **Expo SDK 52** with **Expo Router**
+- **React Native**, **React 19**, **TypeScript**
+- **Redux Toolkit** for state management
+- **Firebase** for Auth, Firestore, Functions, and Storage
+- **Google Gemini** via Live API and Functions proxy
+- **Three.js** + **@pixiv/three-vrm** for 3D avatars
+- **CharacterStudio** as an embedded Vite-based avatar customization subproject
 
----
+## Repository structure
 
-## Repository layout
-
-```
+```text
 app/                   Expo Router screens and routes
 components/            Shared UI, charts, avatar components, hooks
-services/              Firebase, AI, sensors, maps, API clients
-utils/                 Pure helpers — gamification, pose, workout logic
+services/              Firebase, AI, sensors, maps, and API clients
+utils/                 Pure helpers for gamification, pose, and workout logic
 hooks/                 Custom React hooks
-screens/               Legacy screen components (being migrated to app/)
-functions/             Firebase Functions (separate npm package)
-CharacterStudio/       Vite-based avatar tooling (separate package)
+screens/               Legacy screen components being migrated to app/
+functions/             Firebase Functions subproject
+CharacterStudio/       Vite-based avatar tooling subproject
 assets/                Fonts, images, sounds, animations, VRM/FBX models
-tests/                 Jest test suites (353 tests, 18 suites)
+tests/                 Jest test suites
 ```
-
----
 
 ## Getting started
 
 ### Prerequisites
 
-- **Node.js 20+** and **npm 10+**
-- **Expo CLI** — available via `npx expo`
-- **Android Studio** for Android emulator
-- **Xcode** (macOS only) for iOS simulator
+Make sure you have:
 
-### Install
+- **Node.js 20+**
+- **npm 10+**
+- **Android Studio** for Android emulation
+- **Xcode** for iOS simulation on macOS
+- **Expo CLI** available through `npx expo`
+
+### Installation
 
 ```bash
 npm install
 ```
 
-### Configure environment
+### Environment setup
 
 ```bash
 cp .env.example .env
-# then fill in the values — see Environment variables below
 ```
 
-### Run
+Then fill in the values you need for the services you plan to use.
+
+### Run locally
 
 ```bash
-npm run start          # Expo dev server (scan QR for device)
-npm run web            # Browser build at http://localhost:8081
-npm run android        # Android emulator
-npm run ios            # iOS simulator (macOS only)
+npm run start
+npm run web
+npm run android
+npm run ios
 ```
-
----
 
 ## Environment variables
 
-Copy `.env.example` to `.env` and supply the keys you need.
+Copy `.env.example` to `.env` and configure the keys relevant to your setup.
 
-| Variable | Required for |
+| Variable | Purpose |
 |---|---|
 | `EXPO_PUBLIC_GEMINI_API_KEY` | Web/fallback Gemini access |
 | `EXPO_PUBLIC_FUNCTIONS_REGION` | Firebase Functions region |
 | `EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST/PORT` | Local Functions emulator |
-| `SPOONACULAR_API_KEY` | Diet / meal search |
-| `EXERCISEDB_API_KEY` | Exercise catalog (RapidAPI) |
-| `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` | Strava wearable sync |
+| `SPOONACULAR_API_KEY` | Meal and diet search |
+| `EXERCISEDB_API_KEY` | Exercise catalog via RapidAPI |
+| `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` | Strava OAuth and sync |
 | `EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY` | Web maps |
 | `GOOGLE_MAPS_ANDROID_API_KEY` | Android maps |
 
-> **Never commit `.env` or any service-account / OAuth credentials.**
+> Never commit `.env` files, OAuth secrets, or service-account credentials.
 
----
-
-## Scripts
+## Available scripts
 
 | Command | Description |
 |---|---|
-| `npm run start` | Start Expo dev server |
-| `npm run web` | Start Expo web build |
-| `npm run android` | Run on Android |
-| `npm run ios` | Run on iOS (macOS) |
-| `npm run lint` | Expo lint |
-| `npm test` | Run Jest (353 tests) |
-| `npm run tts:proxy` | Start local TTS proxy server |
+| `npm run start` | Start the Expo dev server |
+| `npm run web` | Run the web app locally |
+| `npm run android` | Launch Android build |
+| `npm run ios` | Launch iOS build on macOS |
+| `npm run lint` | Run lint checks |
+| `npm test` | Run the Jest test suite |
+| `npm run tts:proxy` | Start the local TTS proxy |
 | `npm run install-icons` | Refresh icon assets |
 
 ### Subproject scripts
 
 ```bash
 # Firebase Functions
-cd functions && npm run serve      # local emulator
-cd functions && npm run deploy     # deploy to Firebase
+cd functions && npm run serve
+cd functions && npm run deploy
 
 # CharacterStudio
-cd CharacterStudio && npm run dev  # Vite dev server
-cd CharacterStudio && npm test     # Vitest tests
+cd CharacterStudio && npm run dev
+cd CharacterStudio && npm test
 ```
-
----
 
 ## Testing
 
-The test suite uses **Jest + ts-jest** with `react-test-renderer` for UI render tests. No DOM required — all tests run in a Node environment.
+Bodify uses **Jest + ts-jest** with `react-test-renderer` for UI-focused tests in a Node environment.
 
 ```bash
-npm test                                          # all 353 tests
-npx jest --no-coverage --testPathPattern="store"  # single suite
-npx jest --no-coverage --verbose                  # with test names
+npm test
+npx jest --no-coverage --testPathPattern="store"
+npx jest --no-coverage --verbose
 ```
 
-**Coverage areas:**
+### Covered areas
 
 | Suite | Tests |
 |---|---|
@@ -151,45 +160,44 @@ npx jest --no-coverage --verbose                  # with test names
 | Battle script | 27 |
 | Workout session | 27 |
 | Gamification / XP calculations | ~20 |
-| API clients (diet, exercisedb) | 24 |
+| API clients (diet, ExerciseDB) | 24 |
 | UI render (GoogleLogo, BackButton, StepsWidget) | 18 |
 
----
-
-## Wearable integrations
+## Integrations
 
 | Provider | Status |
 |---|---|
 | Strava | Live — OAuth + activity sync |
-| Garmin | UI placeholder (coming soon) |
-| Fitbit | UI placeholder (coming soon) |
-| Apple Health | UI placeholder (coming soon) |
-
----
+| Garmin | Placeholder UI |
+| Fitbit | Placeholder UI |
+| Apple Health | Placeholder UI |
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for branch conventions, commit style, and PR guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit style, and PR expectations.
 
-- Routes live under `app/` using Expo Router file conventions.
-- The Android native folder (`android/`) is checked in — do not delete it.
+Before opening a PR:
+
+- Run `npm test`
+- Run `npm run lint`
+- Follow Expo Router conventions under `app/`
+- Do not delete the checked-in `android/` native folder
+
+Additional notes:
+
 - `node_modules/`, `.expo/`, `dist/`, and `android/app/build/` are gitignored.
-- Firebase client config is public client-side configuration, not a secret.
-- Run `npm test` and `npm run lint` before opening a PR.
-
----
+- Firebase client configuration is public client-side config, not a secret.
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for the full product and engineering plan.
+See [ROADMAP.md](ROADMAP.md) for the longer-term product and engineering plan.
 
-**Near-term focus:**
-- Home loop rebuild with daily missions and AI-framed CTA
+### Near-term focus
+
+- Home loop rebuild with daily missions and stronger AI-led calls to action
 - Avatar cosmetic unlocks and relationship progression
-- Guided workout experience with avatar-led countdown and post-workout recap
+- Guided workouts with avatar-led countdowns and post-workout recaps
 - AI coach memory, caching, and fallback hardening
-
----
 
 ## License
 
