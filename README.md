@@ -1,4 +1,7 @@
-﻿# Bodify
+<p align="center">
+  <img src="assets/icon.png" alt="Bodify app icon" width="100" />
+</p>
+ # Bodify
 
 **Bodify** is an avatar-first fitness game for iOS, Android, and web — built with Expo and React Native. Your 3D avatar reacts to workouts, tracks your progress, and coaches you through missions powered by Google Gemini AI.
 
