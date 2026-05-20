@@ -34,10 +34,7 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: { boxShadow: `0px 2px 8px ${COLORS.neonPurple}40` },
       default: {
-        shadowColor: COLORS.neonPurple,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
+        ...require('../utils/shadow').makeShadow(COLORS.neonPurple, 0, 2, 8, 0.25),
         elevation: 3,
       },
     }),

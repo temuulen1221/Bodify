@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo, useState } from 'react';
-import { Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../components/BackButton';
 import { addWorkoutSession } from '../store';
@@ -338,16 +338,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(122,92,255,0.18)',
   },
   cellActive: {
-    // Web: use boxShadow, Native: use shadow props
-    ...(Platform.OS === 'web'
-      ? { boxShadow: '0 0 8px rgba(0,234,255,0.4)' }
-      : {
-          shadowColor: '#00eaff',
-          shadowOpacity: 0.4,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 3,
-        }),
+    boxShadow: '0px 0px 8px rgba(0,234,255,0.4)',
+    elevation: 3,
   },
   todayCell: {
     borderColor: 'rgba(0,234,255,0.7)',
@@ -358,13 +350,7 @@ const styles = StyleSheet.create({
   dayToday: { color: '#ffffff' },
   starWrap: { position: 'absolute', bottom: 6, right: 6 },
   starIcon: {
-    ...(Platform.OS === 'web'
-      ? { textShadow: '0px 0px 6px rgba(0,234,255,0.8)' } as any
-      : {
-          textShadowColor: 'rgba(0,234,255,0.8)',
-          textShadowRadius: 6,
-          textShadowOffset: { width: 0, height: 0 },
-        }),
+    textShadow: '0px 0px 6px rgba(0,234,255,0.8)',
   },
   legend: { textAlign: 'center', marginTop: 12, color: '#8aa4ff' },
   selectedCell: {

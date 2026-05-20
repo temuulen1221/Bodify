@@ -97,7 +97,7 @@ export default function LevelUpRewardModal() {
         {confetti.map((value, index) => (
           <Animated.View
             key={`confetti-${index}`}
-            pointerEvents="none"
+            style={{ pointerEvents: 'none' }}
             style={[
               styles.confettiPiece,
               {
@@ -186,10 +186,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderWidth: 1,
     borderColor: 'rgba(255, 189, 122, 0.45)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.28,
-    shadowRadius: 30,
+    boxShadow: '0px 18px 30px rgba(0,0,0,0.28)',
     elevation: 14,
     overflow: 'hidden',
   },

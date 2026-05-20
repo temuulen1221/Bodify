@@ -48,6 +48,7 @@ export default function PoseScreen() {
   const selectedPhotoUri = user.photoUri || '';
   const selectedModel = resolveAvatarModelSelection(user.avatarModel, selectedGender);
   const [reps, setReps] = useState(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [compactDetailTab, setCompactDetailTab] = useState<'guide' | 'plan'>('guide');
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -59,6 +60,9 @@ export default function PoseScreen() {
   const [planProgressById, setPlanProgressById] = useState<Record<string, number>>({});
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const nativeWebViewRef = useRef<any>(null);
+  const currentExerciseRef = useRef(currentExercise);
+  // Keep ref in sync so callbacks with stale closures always see the latest exercise
+  useEffect(() => { currentExerciseRef.current = currentExercise; }, [currentExercise]);
   const avatarRef = useRef<any>(null);
   const lastFeedbackAnnouncementRef = useRef('');
   const lastFeedbackAtRef = useRef(0);
@@ -193,8 +197,9 @@ export default function PoseScreen() {
     if (!data || typeof data !== 'object') return;
 
     if (data.type === 'reps') {
-      setReps(data.payload?.reps || 0);
-      dispatch(incrementPoseRep());
+      const incomingReps = data.payload?.reps || 0;
+      if (incomingReps > 0) dispatch(incrementPoseRep());
+      setReps(incomingReps);
       return;
     }
 
@@ -206,6 +211,12 @@ export default function PoseScreen() {
     if (data.type === 'ready') {
       setDetectorStatus('ready');
       setDetectorError('');
+      // Resend exercise config — the first injection on mount fired before the WebView was ready
+      if (Platform.OS !== 'web') {
+        nativeWebViewRef.current?.injectJavaScript(
+          `window.setExercise && window.setExercise(${JSON.stringify(currentExerciseRef.current)}); true;`
+        );
+      }
       return;
     }
 
@@ -285,6 +296,8 @@ export default function PoseScreen() {
   useEffect(()=>{
     if (Platform.OS === 'web') {
       try { iframeRef.current?.contentWindow?.postMessage({ type:'config', exercise: currentExercise }, '*'); } catch(_) {}
+    } else {
+      nativeWebViewRef.current?.injectJavaScript(`window.setExercise && window.setExercise(${JSON.stringify(currentExercise)}); true;`);
     }
   }, [currentExercise]);
 
@@ -455,6 +468,8 @@ export default function PoseScreen() {
     dispatch(resetPoseSession());
     if (Platform.OS === 'web') {
       try { iframeRef.current?.contentWindow?.postMessage({ type: 'reset' }, '*'); } catch (_) {}
+    } else {
+      nativeWebViewRef.current?.injectJavaScript('window.resetDetector && window.resetDetector(); true;');
     }
   }, [dispatch]);
 
@@ -483,7 +498,19 @@ export default function PoseScreen() {
     const firstItem = workoutPlanExercises[0];
     if (!firstItem) return;
 
-    saveInFlightRef.current = false;
+    setCountdown(3);
+    let tick = 3;
+    const interval = setInterval(() => {
+      tick -= 1;
+      if (tick <= 0) {
+        clearInterval(interval);
+        setCountdown(null);
+      } else {
+        setCountdown(tick);
+      }
+    }, 1000);
+    setTimeout(() => {
+      saveInFlightRef.current = false;
     hasSavedSessionRef.current = false;
     setHasSavedSession(false);
     setIsAutoSavingSession(false);
@@ -505,6 +532,7 @@ export default function PoseScreen() {
 
     resetDetectorCounter();
     speakCoachLine(`Starting ${workoutPlan?.title || 'your workout'}. First up: ${firstItem.label}.`);
+    }, 3000);
   }, [dispatch, isStructuredWorkout, playPoseDemo, resetDetectorCounter, speakCoachLine, workoutPlan?.title, workoutPlanExercises]);
 
   const stopWorkoutPlan = useCallback(() => {
@@ -1549,7 +1577,7 @@ export default function PoseScreen() {
           </View>
         ) : null}
 
-        <View style={[styles.compactOverlayDock, { top: compactOverlayTopOffset, height: compactSheetHeight }]} pointerEvents="box-none">
+        <View style={[styles.compactOverlayDock, { top: compactOverlayTopOffset, height: compactSheetHeight, pointerEvents: 'box-none' }]}>
           {compactOverlayOpen ? (
             <Animated.View style={[styles.compactOverlaySheet, { height: compactSheetHeight, transform: [{ translateY: compactSheetTranslateY }] }]}>
               <View style={styles.compactOverlayBody}>
@@ -1579,7 +1607,7 @@ export default function PoseScreen() {
     if (!saveSummaryModal) return null;
 
     return (
-      <View style={styles.saveSummaryOverlay} pointerEvents="box-none">
+      <View style={[styles.saveSummaryOverlay, { pointerEvents: 'box-none' }]}>
         <TouchableOpacity style={styles.saveSummaryBackdrop} activeOpacity={1} onPress={handleCloseSaveSummaryModal} />
         <View style={styles.saveSummaryOverlayContent}>
           <LinearGradient colors={['#0D1624', '#101B2B', '#0A1019']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.saveSummaryCard}>
@@ -1680,6 +1708,11 @@ export default function PoseScreen() {
         {!isCompactMobile ? renderActionBar() : null}
         </View>
         {renderSaveSummaryModal()}
+        {countdown !== null && (
+          <View style={styles.countdownOverlay}>
+            <Text style={styles.countdownNumber}>{countdown === 0 ? 'GO!' : countdown}</Text>
+          </View>
+        )}
         </LinearGradient>
       </SafeAreaView>
     </ScreenFrame>
@@ -1700,6 +1733,8 @@ function PillButton({ label, onPress, variant = 'primary' }: { label: string; on
 }
 
 const styles = StyleSheet.create({
+  countdownOverlay: { position: 'absolute', inset: 0, top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
+  countdownNumber: { fontSize: 120, fontWeight: '900', color: '#00E7FF', textShadowColor: 'rgba(0,231,255,0.6)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 40, letterSpacing: -4 },
   root: { flex: 1, backgroundColor: '#0a0c10' },
   rootGradient: { flex: 1 },
   appShell: { flex: 1 },
@@ -1813,10 +1848,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(6,12,20,0.84)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.14)',
-    ...Platform.select({
-      web: { boxShadow: '0px 16px 32px rgba(0, 0, 0, 0.24)' },
-      default: { shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
-    }),
+    boxShadow: '0px 8px 16px rgba(0,0,0,0.18)',
+    elevation: 8,
   },
   compactPersistentPlanHeader: {
     flexDirection: 'row',
@@ -2126,10 +2159,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     zIndex: 1,
-    ...Platform.select({
-      web: { boxShadow: '0px 18px 40px rgba(0, 0, 0, 0.22)' },
-      default: { shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 8 },
-    }),
+    boxShadow: '0px 10px 18px rgba(0,0,0,0.22)',
+    elevation: 8,
   },
   panelCardCompact: {
     borderRadius: 18,

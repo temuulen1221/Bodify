@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
@@ -10,12 +10,7 @@ const getRegionFromPoints = (points, fallbackPoint) => {
     : (fallbackPoint ? [fallbackPoint] : []);
 
   if (validPoints.length === 0) {
-    return {
-      latitude: 37.7749,
-      longitude: -122.4194,
-      latitudeDelta: DEFAULT_DELTA,
-      longitudeDelta: DEFAULT_DELTA,
-    };
+    return null;
   }
 
   const latitudes = validPoints.map((point) => point.latitude);
@@ -47,7 +42,22 @@ export default function OutdoorLiveMap({
 }) {
   const mapRef = useRef(null);
   const provider = Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
-  const region = useMemo(() => getRegionFromPoints(routePoints, currentFix), [routePoints, currentFix]);
+  const [geoFallback, setGeoFallback] = useState(null);
+
+  useEffect(() => {
+    if (currentFix || geoFallback) return;
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setGeoFallback({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      () => {},
+      { timeout: 8000, maximumAge: 60000 },
+    );
+  }, [currentFix, geoFallback]);
+
+  const region = useMemo(
+    () => getRegionFromPoints(routePoints, currentFix || geoFallback),
+    [routePoints, currentFix, geoFallback],
+  );
   const markerPoint = currentFix || routePoints[routePoints.length - 1] || null;
 
   useEffect(() => {

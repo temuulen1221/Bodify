@@ -290,12 +290,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 22,
     textAlign: 'center',
-    ...(Platform.OS === 'web'
-      ? { textShadow: '0px 1px 6px rgba(0,231,255,0.5)' }
-      : {
-          textShadowColor: 'rgba(0,231,255,0.5)',
-          textShadowOffset: { width: 0, height: 1 },
-          textShadowRadius: 6,
-        }),
+    textShadow: '0px 1px 6px rgba(0,231,255,0.5)',
   },
 });

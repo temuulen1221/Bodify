@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import ErrorBoundary from '../components/ErrorBoundary';
 import InteractiveAvatar from '../components/InteractiveAvatar';
@@ -786,14 +786,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4F8EF7',
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      web: { boxShadow: '0px 4px 12px rgba(0,0,0,0.2)' },
-      default: {
-        shadowColor: '#000',
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-    }),
+    boxShadow: '0px 0px 8px rgba(0,0,0,0.2)',
     elevation: 5,
   },
   actionBtnText: {

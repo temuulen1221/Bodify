@@ -1520,14 +1520,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(0,231,255,0.35)',
-    ...Platform.select({
-      boxShadow: '0px 16px 32px rgba(3,8,24,0.28)',
-      shadowColor: '#040814',
-      shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: 0.28,
-      shadowRadius: 24,
-      elevation: 10,
-    }),
+    boxShadow: '0px 12px 24px rgba(4,8,20,0.28)',
+    elevation: 10,
   },
   questCompactCard: {
     gap: 6,
@@ -1584,14 +1578,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,231,255,0.35)',
     width: '100%',
     maxWidth: 340,
-    ...Platform.select({
-      boxShadow: '0px 18px 36px rgba(3,8,24,0.44)',
-      shadowColor: '#040814',
-      shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: 0.34,
-      shadowRadius: 24,
-      elevation: 12,
-    }),
+    boxShadow: '0px 12px 24px rgba(4,8,20,0.34)',
+    elevation: 12,
   },
   mobileQuestCloseButton: {
     paddingHorizontal: 10,
@@ -1645,12 +1633,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginRight: 2,
     marginLeft: 2,
-    ...Platform.select({
-      textShadow: '0px 1px 2px #FFD700',
-      textShadowColor: '#FFD700',
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 2,
-    }),
+    textShadow: '0px 1px 2px #FFD700',
   },
   treasureIconActive: {
     opacity: 1,
@@ -1768,14 +1751,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(140, 203, 255, 0.22)',
-    ...Platform.select({
-      boxShadow: '0px 0px 16px rgba(122, 92, 255, 0.16)',
-      shadowColor: '#7A5CFF',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.16,
-      shadowRadius: 12,
-      elevation: 3,
-    }),
+    boxShadow: '0px 0px 12px rgba(122,92,255,0.16)',
+    elevation: 3,
   },
   menuTabInnerRow: {
     alignItems: 'center',
@@ -1797,28 +1774,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginRight: 5,
     backgroundColor: '#86B7FF',
-    ...Platform.select({
-      boxShadow: '0px 0px 8px rgba(134,183,255,0.92)',
-      shadowColor: '#86B7FF',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.92,
-      shadowRadius: 8,
-      elevation: 4,
-    }),
+    boxShadow: '0px 0px 8px rgba(134,183,255,0.92)',
+    elevation: 4,
   },
   menuGlyphLine: {
     width: 18,
     height: 3,
     borderRadius: 999,
     backgroundColor: '#A784FF',
-    ...Platform.select({
-      boxShadow: '0px 0px 10px rgba(167,132,255,0.95)',
-      shadowColor: '#A784FF',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.95,
-      shadowRadius: 10,
-      elevation: 4,
-    }),
+    boxShadow: '0px 0px 10px rgba(167,132,255,0.95)',
+    elevation: 4,
   },
   menuGlyphThreeDots: {
     flexDirection: 'row',
@@ -1830,14 +1795,8 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 999,
     backgroundColor: '#A784FF',
-    ...Platform.select({
-      boxShadow: '0px 0px 8px rgba(167,132,255,0.92)',
-      shadowColor: '#A784FF',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.92,
-      shadowRadius: 8,
-      elevation: 4,
-    }),
+    boxShadow: '0px 0px 8px rgba(167,132,255,0.92)',
+    elevation: 4,
   },
   topBar: {
     flexDirection: 'row',
@@ -1847,16 +1806,8 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     borderWidth: 1,
     borderColor: 'rgba(125,182,255,0.35)',
-    ...Platform.select({
-      web: { boxShadow: '0px 18px 32px rgba(17,20,60,0.38)' },
-      default: {
-        shadowColor: '#12163D',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.35,
-        shadowRadius: 24,
-        elevation: 10,
-      },
-    }),
+    boxShadow: '0px 12px 24px rgba(18,22,61,0.35)',
+    elevation: 10,
     zIndex: 10,
     opacity: 0.99,
     overflow: 'hidden',
@@ -1899,12 +1850,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '900',
     color: '#fff',
-    ...Platform.select({
-      textShadow: '0px 1px 2px rgba(34,34,34,0.85)',
-      textShadowColor: '#222',
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 2,
-    })
+    textShadow: '0px 1px 2px #222',
   },
   statsContainer: {
     flexDirection: 'column',
@@ -1916,12 +1862,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#E8F9FF',
     marginBottom: 2,
-    ...Platform.select({
-      textShadow: '0px 1px 3px rgba(0,0,0,0.35)',
-      textShadowColor: 'rgba(0,0,0,0.35)',
-      textShadowOffset: { width: 0, height: 1 },
-      textShadowRadius: 3,
-    }),
+    textShadow: '0px 1px 3px rgba(0,0,0,0.35)',
   },
   h3TitleCompact: {
     fontSize: 16,
@@ -2084,10 +2025,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 17, 43, 0.88)',
     borderWidth: 1,
     borderColor: 'rgba(86, 214, 255, 0.38)',
-    ...Platform.select({
-      web: { boxShadow: '0px 16px 28px rgba(3,8,24,0.34)' },
-      default: { shadowColor: '#040814', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.3, shadowRadius: 24, elevation: 10 },
-    }),
+    boxShadow: '0px 12px 24px rgba(4,8,20,0.3)',
+    elevation: 10,
   },
   todayWorkoutCompactCard: {
     paddingVertical: 7,
@@ -2232,10 +2171,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(0,231,255,0.34)',
     alignItems: 'flex-start',
-    ...Platform.select({
-      web: { boxShadow: '0px 12px 24px rgba(3,8,24,0.34)' },
-      default: { shadowColor: '#040814', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 22, elevation: 10 },
-    }),
+    boxShadow: '0px 10px 22px rgba(4,8,20,0.3)',
+    elevation: 10,
   },
   coachThoughtLabel: {
     color: '#00E7FF',
@@ -2258,10 +2195,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 13, 52, 0.92)',
     borderWidth: 1,
     borderColor: 'rgba(26, 205, 255, 0.42)',
-    ...Platform.select({
-      web: { boxShadow: '0px 18px 34px rgba(3,8,24,0.4)' },
-      default: { shadowColor: '#040814', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.35, shadowRadius: 24, elevation: 12 },
-    }),
+    boxShadow: '0px 12px 24px rgba(4,8,20,0.35)',
+    elevation: 12,
   },
   coachBubbleHeader: {
     flexDirection: 'row',
@@ -2324,16 +2259,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    ...Platform.select({
-      web: { boxShadow: '0px 6px 14px rgba(0,0,0,0.12)' },
-      default: {
-        shadowColor: '#020617',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 8,
-        elevation: 3,
-      },
-    }),
+    boxShadow: '0px 4px 8px rgba(2,6,23,0.12)',
+    elevation: 3,
   },
   coachIconActionText: {
     color: '#FFFFFF',
@@ -2441,10 +2368,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(8, 12, 28, 0.9)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(0,231,255,0.34)',
-    ...Platform.select({
-      web: { boxShadow: '0px 18px 36px rgba(3,8,24,0.34)' },
-      default: { shadowColor: '#040814', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.34, shadowRadius: 24, elevation: 12 },
-    }),
+    boxShadow: '0px 12px 24px rgba(4,8,20,0.34)',
+    elevation: 12,
   },
   coachStripHeader: {
     flexDirection: 'row',
@@ -2552,10 +2477,8 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.18)',
-    ...Platform.select({
-      web: { boxShadow: '0px 18px 48px rgba(0,0,0,0.38)' },
-      default: { shadowColor: '#000', shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.38, shadowRadius: 32, elevation: 18 },
-    }),
+    boxShadow: '0px 18px 32px #000',
+    elevation: 18,
   },
   menuWrapper: {
     position: 'absolute',
@@ -2584,10 +2507,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(0,231,255,0.52)',
     backgroundColor: 'rgba(0,231,255,0.1)',
-    ...Platform.select({
-      web: { boxShadow: '0px 0px 18px rgba(0,231,255,0.24)' },
-      default: { shadowColor: '#00E7FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.24, shadowRadius: 12, elevation: 6 },
-    }),
+    boxShadow: '0px 0px 12px rgba(0,231,255,0.24)',
+    elevation: 6,
   },
   menuActionInner: {
     alignItems: 'center',

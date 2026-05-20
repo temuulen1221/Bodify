@@ -830,8 +830,8 @@ export default function OutdoorTracker() {
           style={styles.mapFullscreen}
         />
 
-        <LinearGradient colors={['rgba(5,8,18,0.58)', 'rgba(5,8,18,0)']} style={styles.topFade} pointerEvents="none" />
-        <LinearGradient colors={['rgba(5,8,18,0)', 'rgba(5,8,18,0.82)']} style={styles.bottomFade} pointerEvents="none" />
+        <LinearGradient colors={['rgba(5,8,18,0.58)', 'rgba(5,8,18,0)']} style={[styles.topFade, { pointerEvents: 'none' }]} />
+        <LinearGradient colors={['rgba(5,8,18,0)', 'rgba(5,8,18,0.82)']} style={[styles.bottomFade, { pointerEvents: 'none' }]} />
 
         <View style={styles.topBar}>
           <View style={styles.topBarShell}>

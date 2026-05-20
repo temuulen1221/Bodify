@@ -336,8 +336,8 @@ export default function DietScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingTop: 24, paddingHorizontal: 16, paddingBottom: 120, backgroundColor: '#18143A' },
-  card: { borderRadius: 18, padding: 16, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '800', textShadowColor: 'rgba(0,231,255,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  card: { borderRadius: 18, padding: 16, boxShadow: '0px 10px 18px rgba(0,0,0,0.35)', elevation: 6 },
+  title: { color: '#fff', fontSize: 22, fontWeight: '800', textShadow: '0px 1px 6px rgba(0,231,255,0.5)' },
   subtitle: { color: 'rgba(255,255,255,0.8)', marginTop: 6, marginBottom: 12 },
   picker: {
     width: '100%',
@@ -435,10 +435,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     width: '100%',
     maxWidth: 340,
-    shadowColor: '#4F8EF7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(79,142,247,0.12)',
     elevation: 2,
   },
   nutritionTitle: {

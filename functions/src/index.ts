@@ -5,7 +5,10 @@ import {
     Timestamp,
 } from "firebase-admin/firestore";
 import { setGlobalOptions } from "firebase-functions";
+import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
+
+const googleGenaiApiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
 setGlobalOptions({maxInstances: 10});
 
@@ -271,7 +274,7 @@ async function executeChatWithAI(
 		throw new HttpsError("invalid-argument", "A non-empty message is required.");
 	}
 
-	const apiKey = process.env.GOOGLE_GENAI_API_KEY;
+	const apiKey = googleGenaiApiKey.value();
 	if (!apiKey) {
 		throw new HttpsError(
 			"failed-precondition",
@@ -347,6 +350,7 @@ function applyLocalCors(response: { set: (name: string, value: string) => void; 
 export const chatWithAI = onCall({
 	region: "us-central1",
 	cors: CALLABLE_CORS_ORIGINS,
+	secrets: [googleGenaiApiKey],
 }, async (request) => {
 	return executeChatWithAI((request.data || {}) as ChatWithAIRequest, request.auth?.uid || null);
 });
@@ -354,6 +358,7 @@ export const chatWithAI = onCall({
 export const chatWithAIHttp = onRequest({
 	region: "us-central1",
 	cors: CALLABLE_CORS_ORIGINS,
+	secrets: [googleGenaiApiKey],
 }, async (request, response) => {
 	applyLocalCors(response, request.headers.origin);
 	if (request.method === "OPTIONS") {

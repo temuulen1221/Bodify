@@ -10,6 +10,7 @@ const DEFAULT_SMOOTHING_WINDOW = 10;
 const DEFAULT_POSE_DETECTION_CONFIDENCE = 0.65;
 const DEFAULT_POSE_PRESENCE_CONFIDENCE = 0.65;
 const DEFAULT_POSE_TRACKING_CONFIDENCE = 0.7;
+const DEFAULT_SEGMENTER_MODEL_ASSET_PATH = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
 
 export const buildPoseDetectorHtml = ({
 	visionBundleUrl = DEFAULT_VISION_BUNDLE_URL,
@@ -24,18 +25,51 @@ export const buildPoseDetectorHtml = ({
 		html,body{margin:0;padding:0;height:100%;background:#000;color:#eee;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
 		#wrap{position:relative;width:100%;height:100%;overflow:hidden}
 		#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-		#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+		#bgCanvas{position:absolute;inset:0;width:100%;height:100%;display:none;transform:scaleX(-1)}
+		#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform:scaleX(-1)}
 		#hud{display:none}
 		#hud strong{color:#fff}
 		#status{display:none}
 		#help{display:none}
 		#feedback{display:none}
+		#bgBtn{position:absolute;bottom:20px;left:16px;z-index:20;display:flex;align-items:center;gap:7px;background:rgba(10,12,30,0.72);border:2px solid rgba(255,255,255,0.18);color:#e8f0ff;font-size:12px;font-weight:800;padding:9px 16px 9px 12px;border-radius:28px;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);letter-spacing:0.04em;box-shadow:0 4px 18px rgba(0,0,0,0.55),0 0 0 0 rgba(120,160,255,0);transition:background 0.18s,box-shadow 0.18s,border-color 0.18s;user-select:none;-webkit-user-select:none}
+		#bgBtn:hover{background:rgba(30,40,90,0.85);box-shadow:0 4px 24px rgba(0,0,0,0.65),0 0 0 3px rgba(120,160,255,0.25)}
+		#bgBtn.active{border-color:rgba(120,200,255,0.55);box-shadow:0 4px 22px rgba(0,0,0,0.55),0 0 12px rgba(80,180,255,0.35)}
+		#bgBtnIcon{font-size:18px;line-height:1}
+		#bgBtnLabel{line-height:1}
+		#bgUploadBtn{display:none;position:absolute;bottom:20px;left:172px;z-index:20;background:rgba(10,12,30,0.72);border:2px solid rgba(255,255,255,0.18);color:#e8f0ff;font-size:18px;padding:9px 12px;border-radius:28px;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 4px 18px rgba(0,0,0,0.55);transition:background 0.18s}
+		#bgUploadBtn:hover{background:rgba(30,40,90,0.85)}
+		#bgGallery{display:none;position:absolute;bottom:72px;left:16px;z-index:30;background:rgba(10,12,30,0.92);border:1.5px solid rgba(255,255,255,0.18);border-radius:18px;padding:14px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 8px 36px rgba(0,0,0,0.7);min-width:260px;max-width:92vw}
+		#bgGallery h4{margin:0 0 10px;font-size:12px;font-weight:700;color:rgba(200,220,255,0.7);letter-spacing:0.08em;text-transform:uppercase}
+		#bgGalleryGrid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+		.bg-thumb{width:72px;height:48px;border-radius:10px;object-fit:cover;cursor:pointer;border:2px solid transparent;transition:border-color 0.15s,transform 0.12s;flex-shrink:0}
+		.bg-thumb:hover{border-color:rgba(100,180,255,0.8);transform:scale(1.06)}
+		.bg-thumb.selected{border-color:#4db8ff}
+		#bgGalleryEmpty{color:rgba(255,255,255,0.4);font-size:12px;margin-bottom:10px}
+		#bgGalleryActions{display:flex;gap:8px}
+		.bg-action-btn{flex:1;padding:8px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#e8f0ff;font-size:12px;font-weight:700;cursor:pointer;transition:background 0.15s}
+		.bg-action-btn:hover{background:rgba(255,255,255,0.16)}
+		#bgGalleryClose{position:absolute;top:10px;right:12px;background:none;border:none;color:rgba(255,255,255,0.5);font-size:18px;cursor:pointer;padding:0;line-height:1}
 	</style>
 </head>
 <body>
 	<div id='wrap'>
 		<video id='video' autoplay playsinline muted></video>
+		<canvas id='bgCanvas'></canvas>
 		<canvas id='overlay'></canvas>
+		<button id='bgBtn' title='Change background'><span id='bgBtnIcon'>🎭</span><span id='bgBtnLabel'>Background</span></button>
+		<button id='bgUploadBtn' title='Manage background photos'>🖼️</button>
+		<input type='file' id='bgImageInput' accept='image/*' style='display:none'/>
+		<div id='bgGallery'>
+			<button id='bgGalleryClose'>×</button>
+			<h4>Background Photos</h4>
+			<div id='bgGalleryGrid'></div>
+			<div id='bgGalleryEmpty' style='display:none'>No saved photos yet</div>
+			<div id='bgGalleryActions'>
+				<button class='bg-action-btn' id='bgAddNewBtn'>＋ Add New</button>
+				<button class='bg-action-btn' id='bgClearBtn'>🗑️ Clear All</button>
+			</div>
+		</div>
 		<div id='hud'><span id='counterLabel'>Count</span>: <strong id='reps'>0</strong></div>
 		<div id='status'>Starting...</div>
 		<div id='help'></div>
@@ -163,12 +197,12 @@ export const buildPoseDetectorHtml = ({
 			setCounterLabel(holdModes.includes(config.mode) ? 'Seconds' : 'Count');
 		}
 
-		function resetState() {
+		function resetState(silent) {
 			state = createState();
 			setCount(0);
 			setFeedback('');
 			updateHudUnit();
-			postMsg('reps', { reps: 0, exercise });
+			if (!silent) postMsg('reps', { reps: 0, exercise });
 		}
 
 		function smoothMetric(name, value) {
@@ -534,11 +568,11 @@ export const buildPoseDetectorHtml = ({
 
 		(async function () {
 			setStatus('Loading model...');
-			const { FilesetResolver, PoseLandmarker, DrawingUtils } = await import(${JSON.stringify(visionBundleUrl)});
+			const { FilesetResolver, PoseLandmarker, ImageSegmenter, DrawingUtils } = await import(${JSON.stringify(visionBundleUrl)});
 			const fileset = await FilesetResolver.forVisionTasks(${JSON.stringify(visionWasmRoot)});
 			const landmarker = await PoseLandmarker.createFromOptions(fileset, {
 				baseOptions: {
-					  modelAssetPath: ${JSON.stringify(poseModelAssetPath)},
+					modelAssetPath: ${JSON.stringify(poseModelAssetPath)},
 				},
 				runningMode: 'VIDEO',
 				numPoses: 1,
@@ -547,14 +581,29 @@ export const buildPoseDetectorHtml = ({
 				minTrackingConfidence: ${DEFAULT_POSE_TRACKING_CONFIDENCE},
 			});
 
+			// Load segmenter in background — does not block pose detection
+			let segmenter = null;
+			ImageSegmenter.createFromOptions(fileset, {
+				baseOptions: { modelAssetPath: ${JSON.stringify(DEFAULT_SEGMENTER_MODEL_ASSET_PATH)} },
+				runningMode: 'VIDEO',
+				outputCategoryMask: true,
+				outputConfidenceMasks: false,
+			}).then(s => { segmenter = s; }).catch(() => {});
+
 			setStatus('Camera...');
 			const video = document.getElementById('video');
 
 			let currentStream = null;
 			let currentFacingMode = 'user';
+			let cameraReady = false;
 
 			async function startCamera(facingMode) {
-				if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); currentStream = null; }
+				if (currentStream) {
+					currentStream.getTracks().forEach(t => t.stop());
+					currentStream = null;
+					// Brief pause for Android hardware to release the camera before re-acquiring
+					await new Promise(r => setTimeout(r, 200));
+				}
 				const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: false }).catch((error) => {
 					const message = formatError(error);
 					setStatus(message); setHelp(message); postMsg('error', message);
@@ -563,53 +612,313 @@ export const buildPoseDetectorHtml = ({
 				currentStream = stream;
 				video.srcObject = stream;
 				video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
+				const _overlay = document.getElementById('overlay');
+				if (_overlay) _overlay.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
 				await video.play();
 				return stream;
 			}
 
 			window.flipCamera = async function() {
 				currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-				try { await startCamera(currentFacingMode); } catch(e) { postMsg('error', 'Flip failed: ' + (e.message||e)); }
+				cameraReady = false;
+				context.clearRect(0, 0, overlay.width, overlay.height);
+				bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+				try {
+					await startCamera(currentFacingMode);
+					// Wait for the new stream to deliver its first frame before re-enabling detection
+					if (video.readyState < 2) {
+						await new Promise(r => {
+							video.addEventListener('canplay', r, { once: true });
+							setTimeout(r, 2500); // safety timeout
+						});
+					}
+					resize();
+				} catch(e) { postMsg('error', 'Flip failed: ' + (e.message||e)); }
+				cameraReady = true;
 			};
 
 			await startCamera(currentFacingMode);
+			cameraReady = true;
 
 			const overlay = document.getElementById('overlay');
 			const context = overlay.getContext('2d');
+			const bgCanvas = document.getElementById('bgCanvas');
+			const bgCtx = bgCanvas.getContext('2d');
+
+			// Offscreen canvases for compositing
+			const personCanvas = document.createElement('canvas');
+			const personCtx = personCanvas.getContext('2d', { willReadFrequently: true });
+
+			// Background modes
+			const BG_MODES  = ['off',        'remove',    'blur',     'space',    'neon',  'photo'];
+			const BG_ICONS  = ['🎭',          '👤',          '🌫️',       '🌌',      '💚',    '🖼️'];
+			const BG_LABELS = ['Background', 'No Background', 'Blur BG',  'Space',    'Neon',  'Photo BG'];
+			let bgModeIndex = 0;
+			let customBgImage = null;
+			const bgBtn         = document.getElementById('bgBtn');
+			const bgBtnIcon     = document.getElementById('bgBtnIcon');
+			const bgBtnLabel    = document.getElementById('bgBtnLabel');
+			const bgUploadBtn   = document.getElementById('bgUploadBtn');
+			const bgImageInput  = document.getElementById('bgImageInput');
+			const bgGallery     = document.getElementById('bgGallery');
+			const bgGalleryGrid = document.getElementById('bgGalleryGrid');
+			const bgGalleryEmpty = document.getElementById('bgGalleryEmpty');
+			const BG_STORAGE_KEY = 'bodify_bg_photos';
+			const BG_MAX_PHOTOS  = 6;
+
+			// --- localStorage helpers ---
+			function loadStoredPhotos() {
+				try { return JSON.parse(localStorage.getItem(BG_STORAGE_KEY) || '[]'); } catch(_) { return []; }
+			}
+			function saveStoredPhotos(arr) {
+				try { localStorage.setItem(BG_STORAGE_KEY, JSON.stringify(arr)); } catch(_) {}
+			}
+			// Compress a File to a base64 jpeg string (max 960px wide)
+			function compressImage(file, cb) {
+				const url = URL.createObjectURL(file);
+				const img = new Image();
+				img.onload = () => {
+					const MAX = 960;
+					let { naturalWidth: w, naturalHeight: h } = img;
+					if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+					const c = document.createElement('canvas');
+					c.width = w; c.height = h;
+					c.getContext('2d').drawImage(img, 0, 0, w, h);
+					cb(c.toDataURL('image/jpeg', 0.82));
+					URL.revokeObjectURL(url);
+				};
+				img.src = url;
+			}
+			// Set a base64 string as the current background
+			function setCustomBgFromDataUrl(dataUrl) {
+				const img = new Image();
+				img.onload = () => { customBgImage = img; };
+				img.src = dataUrl;
+			}
+
+			// --- Gallery UI ---
+			function renderGallery() {
+				const photos = loadStoredPhotos();
+				bgGalleryGrid.innerHTML = '';
+				if (photos.length === 0) {
+					bgGalleryEmpty.style.display = 'block';
+				} else {
+					bgGalleryEmpty.style.display = 'none';
+					photos.forEach((dataUrl, idx) => {
+						const thumb = document.createElement('img');
+						thumb.src = dataUrl;
+						thumb.className = 'bg-thumb';
+						if (customBgImage && customBgImage.src === dataUrl) thumb.classList.add('selected');
+						thumb.addEventListener('click', () => {
+							setCustomBgFromDataUrl(dataUrl);
+							document.querySelectorAll('.bg-thumb').forEach(t => t.classList.remove('selected'));
+							thumb.classList.add('selected');
+							hideGallery();
+						});
+						bgGalleryGrid.appendChild(thumb);
+					});
+				}
+			}
+			function showGallery() { renderGallery(); bgGallery.style.display = 'block'; }
+			function hideGallery() { bgGallery.style.display = 'none'; }
+
+			try {
+				document.getElementById('bgGalleryClose').addEventListener('click', hideGallery);
+				document.getElementById('bgAddNewBtn').addEventListener('click', () => bgImageInput.click());
+				document.getElementById('bgClearBtn').addEventListener('click', () => {
+					saveStoredPhotos([]);
+					customBgImage = null;
+					renderGallery();
+				});
+			} catch(_) {}
+
+			bgImageInput.addEventListener('change', () => {
+				const file = bgImageInput.files && bgImageInput.files[0];
+				if (!file) return;
+				compressImage(file, (dataUrl) => {
+					const photos = loadStoredPhotos();
+					// Prepend new photo, cap at max
+					photos.unshift(dataUrl);
+					if (photos.length > BG_MAX_PHOTOS) photos.pop();
+					saveStoredPhotos(photos);
+					setCustomBgFromDataUrl(dataUrl);
+					renderGallery();
+					hideGallery();
+				});
+				bgImageInput.value = '';
+			});
+
+			function applyBgMode(index) {
+				const mode = BG_MODES[index];
+				const needsCanvas = mode !== 'off';
+				video.style.display = needsCanvas ? 'none' : '';
+				bgCanvas.style.display = needsCanvas ? 'block' : 'none';
+				bgBtn.classList.toggle('active', needsCanvas);
+				// Show gallery button only in photo mode
+				bgUploadBtn.style.display = mode === 'photo' ? 'block' : 'none';
+				if (mode !== 'photo') hideGallery();
+				// Open gallery when entering photo mode
+				if (mode === 'photo') {
+					const stored = loadStoredPhotos();
+					if (stored.length > 0 && !customBgImage) setCustomBgFromDataUrl(stored[0]);
+					showGallery();
+				}
+			}
+
+			bgBtn.addEventListener('click', () => {
+				bgModeIndex = (bgModeIndex + 1) % BG_MODES.length;
+				bgBtnIcon.textContent  = BG_ICONS[bgModeIndex];
+				bgBtnLabel.textContent = BG_LABELS[bgModeIndex];
+				applyBgMode(bgModeIndex);
+			});
+
+			// Gallery button opens the popup
+			bgUploadBtn.addEventListener('click', () => showGallery());
+
+			function drawBgFrame(mode, w, h, maskArr) {
+				bgCtx.clearRect(0, 0, w, h);
+
+				// --- Draw styled background layer ---
+				if (mode === 'photo') {
+					if (customBgImage) {
+						// Cover-fit the custom image
+						const iw = customBgImage.naturalWidth, ih = customBgImage.naturalHeight;
+						const scale = Math.max(w / iw, h / ih);
+						const dw = iw * scale, dh = ih * scale;
+						bgCtx.drawImage(customBgImage, (w - dw) / 2, (h - dh) / 2, dw, dh);
+					} else {
+						// No image chosen yet — draw a placeholder
+						bgCtx.fillStyle = 'rgb(20,20,40)';
+						bgCtx.fillRect(0, 0, w, h);
+						bgCtx.fillStyle = 'rgba(255,255,255,0.35)';
+						bgCtx.font = 'bold 18px system-ui';
+						bgCtx.textAlign = 'center';
+						bgCtx.fillText('Tap 📁 to choose a photo', w / 2, h / 2);
+					}
+				} else if (mode === 'blur') {
+					bgCtx.filter = 'blur(20px) brightness(0.6)';
+					bgCtx.drawImage(video, 0, 0, w, h);
+					bgCtx.filter = 'none';
+				} else if (mode === 'remove') {
+					bgCtx.fillStyle = '#000';
+					bgCtx.fillRect(0, 0, w, h);
+				} else if (mode === 'space') {
+					const g = bgCtx.createLinearGradient(0, 0, w, h);
+					g.addColorStop(0,   'rgb(12,0,36)');
+					g.addColorStop(0.5, 'rgb(26,0,80)');
+					g.addColorStop(1,   'rgb(10,10,46)');
+					bgCtx.fillStyle = g;
+					bgCtx.fillRect(0, 0, w, h);
+				} else if (mode === 'neon') {
+					const g = bgCtx.createLinearGradient(0, 0, w, h);
+					g.addColorStop(0,   'rgb(0,26,14)');
+					g.addColorStop(0.5, 'rgb(0,26,46)');
+					g.addColorStop(1,   'rgb(10,0,26)');
+					bgCtx.fillStyle = g;
+					bgCtx.fillRect(0, 0, w, h);
+				}
+
+				// --- Draw person layer using segmentation mask (all non-off modes) ---
+				if (maskArr) {
+					personCtx.clearRect(0, 0, w, h);
+					personCtx.drawImage(video, 0, 0, w, h);
+					const frame = personCtx.getImageData(0, 0, w, h);
+					const d = frame.data;
+					// selfie_segmenter: 0=person, non-zero=background
+					for (let i = 0; i < maskArr.length; i++) {
+						if (maskArr[i] !== 0) d[i * 4 + 3] = 0;
+					}
+					personCtx.putImageData(frame, 0, 0);
+					bgCtx.drawImage(personCanvas, 0, 0);
+				} else {
+					// Segmenter still loading — fall back to showing full video frame
+					bgCtx.drawImage(video, 0, 0, w, h);
+				}
+			}
 
 			function resize() {
 				const width = video.videoWidth || overlay.clientWidth || window.innerWidth;
 				const height = video.videoHeight || overlay.clientHeight || window.innerHeight;
 				overlay.width = width;
 				overlay.height = height;
+				bgCanvas.width = width;
+				bgCanvas.height = height;
+				personCanvas.width = width;
+				personCanvas.height = height;
 			}
 
 			resize();
+			video.addEventListener('loadedmetadata', resize);
 			window.addEventListener('resize', resize);
 
 			const drawing = new DrawingUtils(context);
 			postMsg('ready', { ok: true });
 			setStatus('Detecting');
 
+			let lastDetectTs = -1;
 			function loop() {
-				const now = performance.now();
-				const result = landmarker.detectForVideo(video, now);
-				context.clearRect(0, 0, overlay.width, overlay.height);
-
-				if (result && result.landmarks && result.landmarks.length > 0) {
-					for (const landmarkSet of result.landmarks) {
-						drawing.drawLandmarks(landmarkSet, { radius: 2, color: '#00E7FF' });
-						drawing.drawConnectors(landmarkSet, PoseLandmarker.POSE_LANDMARKS_LEFT, { color: '#6A00FF', lineWidth: 2 });
-						drawing.drawConnectors(landmarkSet, PoseLandmarker.POSE_LANDMARKS_RIGHT, { color: '#00FFC6', lineWidth: 2 });
-						drawing.drawConnectors(landmarkSet, PoseLandmarker.POSE_LANDMARKS_NEUTRAL, { color: '#CCCCCC', lineWidth: 1 });
+				// requestAnimationFrame MUST always be called — put it in a finally so
+				// any throw anywhere in the loop body can never kill the animation loop.
+				try {
+					const now = performance.now();
+					let result = null;
+					try {
+						if (cameraReady && video.readyState >= 2 && now > lastDetectTs) {
+							result = landmarker.detectForVideo(video, now);
+							lastDetectTs = now;
+						}
+					} catch (_) {
+						// skip frame during camera switch or transient MediaPipe error
 					}
-					handleLandmarks(result.landmarks, now);
-				}
 
-				requestAnimationFrame(loop);
+					// Background compositing (every frame)
+					const bgMode = BG_MODES[bgModeIndex];
+					if (bgMode !== 'off' && cameraReady && video.readyState >= 2) {
+						try {
+							const w = bgCanvas.width;
+							const h = bgCanvas.height;
+							let maskArr = null;
+							if (segmenter) {
+								const sr = segmenter.segmentForVideo(video, now + 0.1);
+								if (sr && sr.categoryMask) {
+									maskArr = sr.categoryMask.getAsUint8Array();
+									sr.categoryMask.close();
+								}
+							}
+							drawBgFrame(bgMode, w, h, maskArr);
+						} catch(_) {}
+					}
+
+					try { context.clearRect(0, 0, overlay.width, overlay.height); } catch (_) {}
+
+					if (result && result.landmarks && result.landmarks.length > 0) {
+						for (const landmarkSet of result.landmarks) {
+							try {
+								drawing.drawConnectors(landmarkSet, PoseLandmarker.POSE_CONNECTIONS, { color: '#00FFC6', lineWidth: 3 });
+								drawing.drawLandmarks(landmarkSet, { radius: 3, color: '#00E7FF', fillColor: '#ffffff' });
+							} catch (_) {}
+						}
+						try { handleLandmarks(result.landmarks, now); } catch (_) {}
+					}
+				} finally {
+					requestAnimationFrame(loop);
+				}
 			}
 
 			requestAnimationFrame(loop);
+
+			// Expose direct globals so react-native-webview can call them via injectJavaScript
+			// setExercise: only switch config + clear UI; React Native side already resets its counter.
+			// Use silent=true to avoid echoing reps=0 back which would cause a re-render cascade.
+			window.setExercise = function(name) {
+				const next = String(name || '').toLowerCase();
+				if (configs[next]) {
+					exercise = next;
+					setHelp(configs[next].help || '');
+					resetState(true);
+				}
+			};
+			window.resetDetector = function() { resetState(); };
 
 			window.addEventListener('message', (event) => {
 				const data = event && event.data || {};

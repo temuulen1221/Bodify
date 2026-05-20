@@ -41,11 +41,7 @@
         "serviceAccountKeyPath": "./service-account.json",
         "track": "production"
       },
-      "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
-      }
+
     }
   }
 }

@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS, GRADIENTS } from '../utils/constants';
@@ -51,9 +51,7 @@ const styles = StyleSheet.create({
     color: COLORS?.neonCyan || '#00E7FF',
     textAlign: 'center',
     marginBottom: 16,
-    textShadowColor: COLORS?.neonPurple || '#6A00FF',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textShadow: `0px 2px 8px ${COLORS?.neonPurple || '#6A00FF'}`,
   },
   subtitle: {
     fontSize: 18,
@@ -69,10 +67,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 40,
     borderRadius: 30,
-    shadowColor: COLORS?.neonCyan || '#00E7FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    ...require('../utils/shadow').makeShadow(COLORS?.neonCyan || '#00E7FF', 0, 4, 8, 0.3),
     elevation: 6,
   },
   skipText: {

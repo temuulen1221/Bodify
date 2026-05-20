@@ -44,7 +44,7 @@ export default function WorkoutRoute() {
 
 		syncAiPlan();
 
-		if (typeof window === 'undefined') {
+		if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
 			return undefined;
 		}
 

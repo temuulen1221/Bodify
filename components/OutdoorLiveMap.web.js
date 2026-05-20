@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-const DEFAULT_CENTER = { lat: 37.7749, lng: -122.4194 };
+const DEFAULT_CENTER = null; // resolved via geolocation at runtime
 const DEFAULT_ZOOM = 15;
 const LOADER_CONFIG_FLAG = '__bodifyGoogleMapsLoaderConfigured';
 
@@ -104,9 +104,24 @@ export default function OutdoorLiveMap({
       if (cancelled || !containerNode) return;
 
       googleRef.current = google;
+      // Use the user's real location as the initial center; fall back to a
+      // world-level zoom so the map is never stuck on San Francisco.
+      const initialCenter = await new Promise((resolve) => {
+        if (typeof navigator !== 'undefined' && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            () => resolve(null),
+            { timeout: 6000, maximumAge: 60000 },
+          );
+        } else {
+          resolve(null);
+        }
+      });
+      if (cancelled) return;
+
       mapRef.current = new Map(containerNode, {
-        center: DEFAULT_CENTER,
-        zoom: DEFAULT_ZOOM,
+        center: initialCenter || { lat: 20, lng: 0 },
+        zoom: initialCenter ? DEFAULT_ZOOM : 2,
         ...(mapId ? { mapId } : {}),
         disableDefaultUI: true,
         clickableIcons: false,
@@ -260,9 +275,17 @@ export default function OutdoorLiveMap({
         pointsToFit.forEach((point) => bounds.extend(point));
         map.fitBounds(bounds, 48);
       }
-    } else {
-      map.setCenter(DEFAULT_CENTER);
-      map.setZoom(DEFAULT_ZOOM);
+    } else if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (mapRef.current) {
+            mapRef.current.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            mapRef.current.setZoom(DEFAULT_ZOOM);
+          }
+        },
+        () => {},
+        { timeout: 6000, maximumAge: 60000 },
+      );
     }
   }, [boundsPayload, currentFix, destinationPoint, destinationPoints, followUser, plannedBoundsPayload, recenterSignal]);
 

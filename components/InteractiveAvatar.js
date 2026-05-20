@@ -1234,14 +1234,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: '#FF4444',
-    ...Platform.select({
-      web: { boxShadow: '0px 0px 8px rgba(255,68,68,0.8)' },
-      default: {
-        shadowColor: '#FF4444',
-        shadowOpacity: 0.8,
-        shadowRadius: 4,
-      },
-    }),
+    boxShadow: '0px 0px 4px rgba(255,68,68,0.8)',
     elevation: 5,
   },
   animationIndicator: {
@@ -1249,14 +1242,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: '#44FF44',
-    ...Platform.select({
-      web: { boxShadow: '0px 0px 8px rgba(68,255,68,0.8)' },
-      default: {
-        shadowColor: '#44FF44',
-        shadowOpacity: 0.8,
-        shadowRadius: 4,
-      },
-    }),
+    boxShadow: '0px 0px 4px rgba(68,255,68,0.8)',
     elevation: 5,
   },
 });

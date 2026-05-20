@@ -28,7 +28,7 @@ const isLocalWebDev = () => (
 );
 const DIRECT_GEMINI_ENABLED =
   String(process.env.EXPO_PUBLIC_USE_DIRECT_GEMINI_FALLBACK || '').toLowerCase() === 'true' ||
-  (Boolean(DIRECT_GEMINI_API_KEY) && isLocalWebDev());
+  (Boolean(DIRECT_GEMINI_API_KEY) && (__DEV__ || isLocalWebDev()));
 const DIRECT_GEMINI_PRIMARY = DIRECT_GEMINI_ENABLED && Boolean(DIRECT_GEMINI_API_KEY);
 const buildDirectGeminiApiUrl = (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 const DEFAULT_RESPONSE = {
@@ -216,7 +216,9 @@ export class GeminiAvatarService {
   }
 
   shouldUseDirectFallback(error) {
-    if (!this.usesDirectGemini() || !DIRECT_GEMINI_API_KEY) {
+    // Always allow fallback to direct Gemini when the API key is available,
+    // regardless of platform or DIRECT_GEMINI_ENABLED (which requires window.location on web).
+    if (!DIRECT_GEMINI_API_KEY) {
       return false;
     }
     const message = String(error?.message || error || '').toLowerCase();

@@ -24,7 +24,7 @@ export default function CompactCyberBadge({ iconName, label, level, rank, progre
         style={[
           styles.compactBadgeShadow,
           selected && styles.compactBadgeShadowSelected,
-          { width: size, height: size, shadowColor: palette.color, backgroundColor: selected ? palette.glow : 'transparent' },
+          { width: size, height: size, backgroundColor: selected ? palette.glow : 'transparent' },
         ]}
       />
       {selected ? <View style={[styles.compactBadgeHalo, { width: size + 20, height: size + 20, borderColor: `${palette.color}45`, backgroundColor: palette.glow }]} /> : null}

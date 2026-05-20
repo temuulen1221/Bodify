@@ -217,8 +217,8 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingTop: 24, paddingHorizontal: 16, paddingBottom: 120, backgroundColor: '#05020B' },
-  card: { borderRadius: 18, padding: 16, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '800', textShadowColor: 'rgba(0,231,255,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  card: { borderRadius: 18, padding: 16, boxShadow: '0px 10px 18px rgba(0,0,0,0.35)', elevation: 6 },
+  title: { color: '#fff', fontSize: 22, fontWeight: '800', textShadow: '0px 1px 6px rgba(0,231,255,0.5)' },
   subtitle: { color: 'rgba(255,255,255,0.8)', marginTop: 6, marginBottom: 12 },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.3)', marginVertical: 6 },
   row: { backgroundColor: 'rgba(0,0,0,0.25)', borderColor: 'rgba(0,231,255,0.35)', borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 12, marginTop: 10 },
@@ -236,10 +236,7 @@ const styles = StyleSheet.create({
   },
   permissionCardFocused: {
     borderColor: 'rgba(255,179,71,0.7)',
-    shadowColor: '#ffb347',
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 0 },
+    boxShadow: '0px 0px 18px rgba(255,179,71,0.18)',
   },
   permissionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   permissionTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },

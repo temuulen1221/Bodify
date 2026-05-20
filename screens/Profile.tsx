@@ -861,10 +861,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(117, 171, 255, 0.18)',
-    shadowColor: COLORS.neonPurple,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
+    ...require('../utils/shadow').makeShadow(COLORS.neonPurple, 0, 12, 18, 0.24),
     elevation: 8,
   },
   backRow: {

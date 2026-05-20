@@ -331,10 +331,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(0,231,255,0.18)',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 },
+    boxShadow: '0px 6px 8px #000',
     elevation: 3,
   },
   youRow: {
@@ -413,10 +410,7 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: 'rgba(0,231,255,0.25)',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 10 },
+    boxShadow: '0px 10px 14px #000',
     elevation: 8,
   },
   modalTitle: {
