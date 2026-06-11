@@ -8,6 +8,8 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, To
 import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../components/BackButton';
 import MonthlyStepsChart from '../components/MonthlyStepsChart';
+import TitleDisplay from '../components/TitleDisplay';
+import TitleSelectorModal from '../components/TitleSelectorModal';
 import WeeklyStepsChart from '../components/WeeklyStepsChart';
 import WeeklyWorkoutsChart from '../components/WeeklyWorkoutsChart';
 import { auth, db } from '../services/firebase';
@@ -96,6 +98,7 @@ const ProfileScreen = () => {
   const [saveError, setSaveError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [syncNotice, setSyncNotice] = useState('');
+  const [titleSelectorVisible, setTitleSelectorVisible] = useState(false);
 
   useEffect(() => {
     navigation.setOptions?.({
@@ -528,6 +531,10 @@ const ProfileScreen = () => {
               ) : (
                 <>
                   <Text style={styles.heroName}>{displayName}</Text>
+                  <Pressable onPress={() => setTitleSelectorVisible(true)} style={styles.titleSelectRow}>
+                    <TitleDisplay />
+                    <Text style={styles.titleEditIcon}>✎</Text>
+                  </Pressable>
                   <Text style={styles.heroSubline}>Body composition, movement volume, and training consistency only.</Text>
                   {syncNotice ? <Text style={styles.syncNotice}>{syncNotice}</Text> : null}
                 </>
@@ -803,6 +810,7 @@ const ProfileScreen = () => {
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
+      <TitleSelectorModal visible={titleSelectorVisible} onClose={() => setTitleSelectorVisible(false)} />
     </View>
   );
 };
@@ -946,6 +954,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginTop: 6,
+  },
+  titleSelectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  titleEditIcon: {
+    color: '#7287A9',
+    fontSize: 12,
+    fontWeight: '700',
+    opacity: 0.8,
   },
   syncNotice: {
     color: '#9CE6B8',

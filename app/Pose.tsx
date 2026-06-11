@@ -7,12 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../components/BackButton';
+import BoosterIndicator from '../components/BoosterIndicator';
 import ErrorBoundary from '../components/ErrorBoundary';
 import InteractiveAvatar from '../components/InteractiveAvatar';
 import ScreenFrame from '../components/ScreenFrame';
 import { acceptPrivacy, addBadgeXP, addWeeklySquatReps, addWorkoutSession, addXP, incrementPoseRep, markWeeklyXPAwarded, resetPoseSession, setFormFeedback, setPoseExercise } from '../store';
 import { AVATAR_ANIMATIONS } from '../utils/avatarAnimationConfig';
 import { resolveAvatarModelSelection } from '../utils/avatarModels';
+import { calcCalories, calcXPFromReps } from '../utils/fitnessALU';
 import { getPoseExerciseDefinition, getPoseExerciseForAnimation, getPoseExerciseMetricLabel, isHoldBasedPoseExercise, POSE_EXERCISE_OPTIONS } from '../utils/poseExerciseConfig';
 import {
     buildStablePosePreviewDemo,
@@ -72,6 +74,10 @@ export default function PoseScreen() {
   const lastMotivationIndexRef = useRef(-1);
   const saveInFlightRef = useRef(false);
   const hasSavedSessionRef = useRef(false);
+  // Form quality tracking: count reps completed with no active form hint
+  const formGoodRepsRef = useRef(0);
+  const formTotalRepsRef = useRef(0);
+  const lastFormFeedbackRef = useRef('');
   const [demoLabel, setDemoLabel] = useState('Squat preview');
   const [saveMessage, setSaveMessage] = useState('');
   const [saveMessageTone, setSaveMessageTone] = useState<'idle' | 'success' | 'warning'>('idle');
@@ -198,12 +204,18 @@ export default function PoseScreen() {
 
     if (data.type === 'reps') {
       const incomingReps = data.payload?.reps || 0;
-      if (incomingReps > 0) dispatch(incrementPoseRep());
+      if (incomingReps > 0) {
+        dispatch(incrementPoseRep());
+        // Track form quality: good rep = no active form hint at completion time
+        formTotalRepsRef.current += 1;
+        if (!lastFormFeedbackRef.current) formGoodRepsRef.current += 1;
+      }
       setReps(incomingReps);
       return;
     }
 
     if (data.type === 'feedback' && data.payload?.text) {
+      lastFormFeedbackRef.current = data.payload.text;
       dispatch(setFormFeedback(data.payload.text));
       return;
     }
@@ -602,7 +614,24 @@ export default function PoseScreen() {
     const d = new Date();
     const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const durationMin = Math.max(1, Math.round(elapsedSeconds / 60));
-    const calories = Math.max(40, Math.round(totalTrackedValueSnapshot * 0.5));
+    // ALU-based calorie estimate: MET × weight × reps pipeline
+    const weightKg = Math.min(255, Math.max(1, parseInt(selectedWeight, 10) || 70));
+    const { kcal: aluCalories } = calcCalories(
+      Math.min(255, Math.round(totalTrackedValueSnapshot)),
+      currentExercise,
+      weightKg,
+    );
+    const calories = Math.max(40, aluCalories);
+    // ALU-based form score (0–255): ratio of good reps to total reps
+    const formScore = formTotalRepsRef.current > 0
+      ? Math.round((formGoodRepsRef.current / formTotalRepsRef.current) * 255)
+      : 128;
+    const formXPResult: any = calcXPFromReps(
+      Math.min(255, Math.round(totalTrackedValueSnapshot)),
+      formScore,
+    );
+    const formBonusXP = formXPResult.xp;
+    const formBreakdown = formXPResult.breakdown || { goodForm: false, bonusXP: 0, baseXP: 0 };
     const exerciseLabel = currentExerciseDefinition?.label || currentExercise;
     const sessionTitle = workoutPlan?.title || `${exerciseLabel} (pose)`;
     const sessionNotes = isHoldExercise
@@ -699,13 +728,14 @@ export default function PoseScreen() {
       return;
     }
 
+    const formScoreLabel = formScore >= 200 ? 'Excellent' : formScore >= 128 ? 'Good' : 'Needs work';
     setSaveSummaryModal({
       title: sessionTitle,
-      xp: Math.max(0, Number((sessionRecord as any).awardedXP) || 0) + weeklyBonusXP,
+      xp: Math.max(0, Number((sessionRecord as any).awardedXP) || 0) + weeklyBonusXP + (formBreakdown.goodForm ? formBreakdown.bonusXP : 0),
       calories,
       elapsedSeconds,
       nextAiPlan,
-      subtitle: 'Here is your session result.',
+      subtitle: `Form quality: ${formScoreLabel} (${formScore}/255) · ${formBreakdown.goodForm ? `+${formBreakdown.bonusXP} form bonus XP` : 'Good form earns +50% XP'}`,
       buttonLabel: 'Close',
       navigateOnClose: false,
     });
@@ -1139,6 +1169,7 @@ export default function PoseScreen() {
 
   const renderWorkoutPlanCard = () => (
     <View style={isCompactMobile ? styles.panelCardCompact : styles.panelCard}>
+      <BoosterIndicator />
       <View style={isCompactMobile ? styles.sectionHeaderCompact : styles.sectionHeader}>
         <View>
           <Text style={styles.sectionEyebrow}>Workout Plan</Text>

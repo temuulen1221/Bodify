@@ -41,6 +41,45 @@ const hasGoogleMapsScript = () => {
   return Boolean(document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]'));
 };
 
+const createAvatarMarkerElement = () => {
+  if (typeof document === 'undefined') return null;
+
+  const root = document.createElement('div');
+  root.style.position = 'relative';
+  root.style.width = '40px';
+  root.style.height = '40px';
+
+  const halo = document.createElement('div');
+  halo.style.position = 'absolute';
+  halo.style.left = '1px';
+  halo.style.top = '1px';
+  halo.style.width = '38px';
+  halo.style.height = '38px';
+  halo.style.borderRadius = '999px';
+  halo.style.background = 'rgba(122,92,255,0.2)';
+  halo.style.border = '1px solid rgba(0,234,255,0.45)';
+
+  const core = document.createElement('div');
+  core.style.position = 'absolute';
+  core.style.left = '5px';
+  core.style.top = '5px';
+  core.style.width = '30px';
+  core.style.height = '30px';
+  core.style.borderRadius = '999px';
+  core.style.background = '#7a5cff';
+  core.style.border = '2px solid #e8f6ff';
+  core.style.display = 'flex';
+  core.style.alignItems = 'center';
+  core.style.justifyContent = 'center';
+  core.style.boxShadow = '0 3px 10px rgba(6, 12, 38, 0.32)';
+  core.style.fontSize = '14px';
+  core.textContent = '🧍';
+
+  root.appendChild(halo);
+  root.appendChild(core);
+  return root;
+};
+
 export default function OutdoorLiveMap({
   routePoints = [],
   plannedRoutePoints = [],
@@ -156,7 +195,7 @@ export default function OutdoorLiveMap({
       markerRef.current = new AdvancedMarkerElement({
         map: mapRef.current,
         title: 'Current location',
-        content: new PinElement({
+        content: createAvatarMarkerElement() || new PinElement({
           background: '#7a5cff',
           borderColor: '#d9d0ff',
           glyphColor: '#ffffff',

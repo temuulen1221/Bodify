@@ -11,6 +11,7 @@ import { AVATAR_ANIMATIONS, IDLE_LOOP_ANIMATION_OPTIONS, getAvatarAnimationDurat
 import { buildAiWorkoutPlanFromGuide, inferPendingWorkoutGuideFromExchange, isWorkoutDemoConfirmation, isWorkoutStartConfirmation } from '../utils/avatarWorkoutHelpers';
 import { COLORS, GRADIENTS } from '../utils/constants';
 import AvatarWeb from './AvatarWeb';
+import KudosCounter from './KudosCounter';
 import { useAIAvatar } from './useAIAvatar';
 import { useVroidAuth } from './useVroidAuth';
 
@@ -1162,6 +1163,10 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+
+      <View style={[styles.kudosContainer, { alignSelf: 'center', marginTop: 8 }]}>
+        <KudosCounter />
+      </View>
 
       {workoutSuggestionExpanded ? (
         <View

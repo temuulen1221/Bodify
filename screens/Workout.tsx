@@ -8,7 +8,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../components/BackButton';
 import InteractiveAvatar from '../components/InteractiveAvatar';
 import { listBodyParts, listByBodyPart, searchExercises } from '../services/exercisedb';
-import { fetchRecentActivities, getStoredToken, signInWithStrava } from '../services/strava';
+import { clearStoredToken, fetchRecentActivities, getStoredToken, getStravaConfigStatus, getStravaConnectionStatus, signInWithStrava } from '../services/strava';
 import { addBadgeXP, addWorkoutSession, addXP, setPoseExercise } from '../store';
 import { AVATAR_ANIMATIONS, getAvatarAnimationDuration, resolveAvatarAnimationConfig, WORKOUT_ANIMATION_TYPES } from '../utils/avatarAnimationConfig';
 import { resolveAvatarModelSelection } from '../utils/avatarModels';
@@ -211,6 +211,8 @@ export default function Workout({ aiPlanRaw = '' }) {
   const [connecting, setConnecting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [wearableConnected, setWearableConnected] = useState(false);
+  const [wearableError, setWearableError] = useState('');
+  const [wearableSyncNote, setWearableSyncNote] = useState('');
   const savedSession = Array.isArray(params?.sessionSaved) ? params.sessionSaved[0] : params?.sessionSaved;
   const savedSessionTitle = Array.isArray(params?.sessionSavedTitle) ? params.sessionSavedTitle[0] : params?.sessionSavedTitle;
 
@@ -238,6 +240,33 @@ export default function Workout({ aiPlanRaw = '' }) {
 
   const now = new Date();
   const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const existingWorkoutIds = useMemo(() => {
+    const idSet = new Set<string>();
+    Object.values(sessionsByDate || {}).forEach((daySessions: any) => {
+      if (!Array.isArray(daySessions)) return;
+      daySessions.forEach((session: any) => {
+        const sessionId = String(session?.id || '').trim();
+        if (sessionId) idSet.add(sessionId);
+      });
+    });
+    return idSet;
+  }, [sessionsByDate]);
+
+  const refreshWearableConnection = useCallback(async () => {
+    try {
+      const status = await getStravaConnectionStatus();
+      setWearableConnected(Boolean(status.connected));
+    } catch (_) {
+      setWearableConnected(false);
+    }
+  }, []);
+
+  const ensureStravaConfigured = useCallback(() => {
+    const configStatus = getStravaConfigStatus();
+    if (configStatus.ready) return true;
+    setWearableError('Strava is not configured. Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in .env, then reload the app.');
+    return false;
+  }, []);
 
   // Enable LayoutAnimation on Android to smooth layout changes
   useEffect(() => {
@@ -279,13 +308,15 @@ export default function Workout({ aiPlanRaw = '' }) {
 
     (async () => {
       try {
-        const token = await getStoredToken();
+        const status = await getStravaConnectionStatus();
         if (active) {
-          setWearableConnected(Boolean(token?.access_token));
+          setWearableConnected(Boolean(status.connected));
+          setWearableError('');
         }
-      } catch (_) {
+      } catch (error: unknown) {
         if (active) {
           setWearableConnected(false);
+          setWearableError((error as Error)?.message || 'Unable to verify Strava connection.');
         }
       }
     })();
@@ -628,7 +659,12 @@ export default function Workout({ aiPlanRaw = '' }) {
   ), [recent]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={(styles as any).contentContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      scrollIndicatorInsets={{ bottom: 170 }}
+      showsVerticalScrollIndicator={false}
+    >
       <LinearGradient colors={["#0d1024", "#0a0f1e"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerWrap}>
         <LinearGradient colors={["rgba(122,92,255,0.35)", "rgba(0,234,255,0.35)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <BackButton />
@@ -775,6 +811,63 @@ export default function Workout({ aiPlanRaw = '' }) {
         </View>
       </View>
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={sampleWorkoutsExpanded ? 'Hide sample workouts' : 'Browse sample workouts'}
+        onPress={() => setSampleWorkoutsExpanded((value) => !value)}
+        style={({ pressed }) => [styles.sampleWorkoutToggle, pressed && styles.sampleWorkoutTogglePressed]}
+      >
+        <View>
+          <Text style={styles.sectionLabel}>Sample Workouts</Text>
+          <Text style={styles.sampleWorkoutToggleMeta}>{`${sampleAssetWorkouts.length} presets ready`}</Text>
+        </View>
+        <View style={styles.sampleWorkoutToggleRight}>
+          <Text style={styles.sampleWorkoutToggleAction}>{sampleWorkoutsExpanded ? 'Hide' : 'Browse Samples'}</Text>
+          <Ionicons name={sampleWorkoutsExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#dff8ff" />
+        </View>
+      </Pressable>
+      {sampleWorkoutsExpanded ? (
+        <View style={styles.sampleWorkoutList}>
+          {sampleAssetWorkouts.map((samplePlan) => (
+            <View key={samplePlan.key} style={styles.sampleWorkoutCard}>
+              <View style={styles.sampleWorkoutHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sampleWorkoutTitle}>{samplePlan.title}</Text>
+                  <Text style={styles.sampleWorkoutMeta}>{`${samplePlan.durationMin} min · ${samplePlan.exercises.length} moves · ${samplePlan.poseReadyCount}/${samplePlan.exercises.length} pose-ready`}</Text>
+                </View>
+                <Text style={styles.sampleWorkoutBadge}>Assets + Pose</Text>
+              </View>
+              <View style={styles.sampleWorkoutTagRow}>
+                <View style={styles.sampleWorkoutTag}>
+                  <Text style={styles.sampleWorkoutTagText}>{samplePlan.level}</Text>
+                </View>
+                <View style={styles.sampleWorkoutTag}>
+                  <Text style={styles.sampleWorkoutTagText}>{samplePlan.focus}</Text>
+                </View>
+              </View>
+              <Text style={styles.sampleWorkoutSummary} numberOfLines={2}>{samplePlan.summary}</Text>
+              <Text style={styles.sampleWorkoutExerciseList} numberOfLines={1}>
+                {samplePlan.exercises.map((item) => item.label).join(' · ')}
+              </Text>
+              <View style={styles.sampleWorkoutActions}>
+                <Pressable
+                  onPress={() => loadSampleWorkoutPlan(samplePlan)}
+                  style={({ pressed }) => [styles.sampleWorkoutButton, pressed && styles.sampleWorkoutButtonPressed]}
+                >
+                  <Text style={styles.sampleWorkoutButtonText}>Replace Plan</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => appendSampleWorkoutPlan(samplePlan)}
+                  style={({ pressed }) => [styles.sampleWorkoutSecondaryButton, pressed && styles.sampleWorkoutButtonPressed]}
+                >
+                  <Text style={styles.sampleWorkoutSecondaryButtonText}>Add To Plan</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.modeSection}>
         <View style={styles.modeSectionHeader}>
           <View>
@@ -839,10 +932,13 @@ export default function Workout({ aiPlanRaw = '' }) {
             onPress={async () => {
               try {
                 setConnecting(true);
+                setWearableError('');
+                if (!ensureStravaConfigured()) return;
                 await signInWithStrava();
-                setWearableConnected(true);
-              } catch (e) {
-                console.warn('Strava connect failed', e);
+                await refreshWearableConnection();
+                setWearableSyncNote('Strava connected. You can import activities now.');
+              } catch (e: unknown) {
+                setWearableError((e as Error)?.message || 'Strava connection failed.');
               } finally {
                 setConnecting(false);
               }
@@ -856,20 +952,34 @@ export default function Workout({ aiPlanRaw = '' }) {
             onPress={async () => {
               try {
                 setImporting(true);
+                setWearableError('');
+                if (!ensureStravaConfigured()) return;
                 const token = await getStoredToken();
                 if (!token) {
                   await signInWithStrava();
-                  setWearableConnected(true);
+                  await refreshWearableConnection();
                 }
                 const acts = await fetchRecentActivities(5);
+                let importedCount = 0;
+                let skippedCount = 0;
                 for (const a of acts) {
+                  const sessionId = String(a?.id || '').trim();
+                  if (!sessionId) {
+                    skippedCount += 1;
+                    continue;
+                  }
+                  if (existingWorkoutIds.has(sessionId)) {
+                    skippedCount += 1;
+                    continue;
+                  }
+
                   const start = new Date(a.start_date_local || a.start_date);
                   const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
                   dispatch(
                     addWorkoutSession({
                       date: key,
                       session: {
-                        id: String(a.id),
+                        id: sessionId,
                         title: a.name || 'Strava Activity',
                         durationMin: Math.max(1, Math.round((a.moving_time || a.elapsed_time || 0) / 60)),
                         calories: Math.round(a.kilojoules || a.calories || 0),
@@ -880,9 +990,16 @@ export default function Workout({ aiPlanRaw = '' }) {
                       },
                     })
                   );
+                  existingWorkoutIds.add(sessionId);
+                  importedCount += 1;
                 }
-              } catch (e) {
-                console.warn('Import failed', e);
+                setWearableSyncNote(
+                  importedCount > 0
+                    ? `Imported ${importedCount} Strava activit${importedCount === 1 ? 'y' : 'ies'}${skippedCount > 0 ? ` · skipped ${skippedCount} duplicate${skippedCount === 1 ? '' : 's'}` : ''}.`
+                    : (skippedCount > 0 ? `No new activities. Skipped ${skippedCount} duplicate${skippedCount === 1 ? '' : 's'}.` : 'No recent Strava activities found.')
+                );
+              } catch (e: unknown) {
+                setWearableError((e as Error)?.message || 'Strava import failed.');
               } finally {
                 setImporting(false);
               }
@@ -892,64 +1009,26 @@ export default function Workout({ aiPlanRaw = '' }) {
             <Text style={styles.connectText}>{importing ? 'Importing…' : 'Import Strava'}</Text>
           </Pressable>
         </View>
+        {wearableConnected ? (
+          <Pressable
+            onPress={async () => {
+              try {
+                setWearableError('');
+                await clearStoredToken();
+                setWearableConnected(false);
+                setWearableSyncNote('Strava disconnected.');
+              } catch (error: unknown) {
+                setWearableError((error as Error)?.message || 'Unable to disconnect Strava.');
+              }
+            }}
+            style={({ pressed }) => [styles.disconnectBtn, pressed && { opacity: 0.9 }]}
+          >
+            <Text style={styles.disconnectText}>Disconnect Strava</Text>
+          </Pressable>
+        ) : null}
+        {wearableSyncNote ? <Text style={styles.wearableNote}>{wearableSyncNote}</Text> : null}
+        {wearableError ? <Text style={styles.wearableError}>{wearableError}</Text> : null}
       </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={sampleWorkoutsExpanded ? 'Hide sample workouts' : 'Browse sample workouts'}
-        onPress={() => setSampleWorkoutsExpanded((value) => !value)}
-        style={({ pressed }) => [styles.sampleWorkoutToggle, pressed && styles.sampleWorkoutTogglePressed]}
-      >
-        <View>
-          <Text style={styles.sectionLabel}>Sample Workouts</Text>
-          <Text style={styles.sampleWorkoutToggleMeta}>{`${sampleAssetWorkouts.length} presets ready`}</Text>
-        </View>
-        <View style={styles.sampleWorkoutToggleRight}>
-          <Text style={styles.sampleWorkoutToggleAction}>{sampleWorkoutsExpanded ? 'Hide' : 'Browse Samples'}</Text>
-          <Ionicons name={sampleWorkoutsExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#dff8ff" />
-        </View>
-      </Pressable>
-      {sampleWorkoutsExpanded ? (
-        <View style={styles.sampleWorkoutList}>
-          {sampleAssetWorkouts.map((samplePlan) => (
-            <View key={samplePlan.key} style={styles.sampleWorkoutCard}>
-              <View style={styles.sampleWorkoutHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sampleWorkoutTitle}>{samplePlan.title}</Text>
-                  <Text style={styles.sampleWorkoutMeta}>{`${samplePlan.durationMin} min · ${samplePlan.exercises.length} moves · ${samplePlan.poseReadyCount}/${samplePlan.exercises.length} pose-ready`}</Text>
-                </View>
-                <Text style={styles.sampleWorkoutBadge}>Assets + Pose</Text>
-              </View>
-              <View style={styles.sampleWorkoutTagRow}>
-                <View style={styles.sampleWorkoutTag}>
-                  <Text style={styles.sampleWorkoutTagText}>{samplePlan.level}</Text>
-                </View>
-                <View style={styles.sampleWorkoutTag}>
-                  <Text style={styles.sampleWorkoutTagText}>{samplePlan.focus}</Text>
-                </View>
-              </View>
-              <Text style={styles.sampleWorkoutSummary} numberOfLines={2}>{samplePlan.summary}</Text>
-              <Text style={styles.sampleWorkoutExerciseList} numberOfLines={1}>
-                {samplePlan.exercises.map((item) => item.label).join(' · ')}
-              </Text>
-              <View style={styles.sampleWorkoutActions}>
-                <Pressable
-                  onPress={() => loadSampleWorkoutPlan(samplePlan)}
-                  style={({ pressed }) => [styles.sampleWorkoutButton, pressed && styles.sampleWorkoutButtonPressed]}
-                >
-                  <Text style={styles.sampleWorkoutButtonText}>Replace Plan</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => appendSampleWorkoutPlan(samplePlan)}
-                  style={({ pressed }) => [styles.sampleWorkoutSecondaryButton, pressed && styles.sampleWorkoutButtonPressed]}
-                >
-                  <Text style={styles.sampleWorkoutSecondaryButtonText}>Add To Plan</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
 
       {/* ExerciseDB search */}
       <View style={styles.searchRow}>
@@ -1069,7 +1148,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#080b16',
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 110,
+  },
+  scrollContent: {
+    paddingBottom: 170,
   },
   headerWrap: {
     borderRadius: 18,
@@ -1077,6 +1158,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   header: {
+    position: 'relative',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -1513,7 +1595,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 8,
   },
-  headerText: { color: '#d9eaff', fontWeight: '900', fontSize: 18, letterSpacing: 0.3 },
+  headerText: {
+    position: 'absolute',
+    top: 9,
+    right: 14,
+    color: '#d9eaff',
+    fontWeight: '900',
+    fontSize: 20,
+    letterSpacing: 0.3,
+  },
   sectionLabel: { color: '#9feaff', fontWeight: '900', fontSize: 13, marginBottom: 6 },
   modeSection: {
     marginBottom: 12,
@@ -1674,6 +1764,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   connectText: { color: '#e8f3ff', fontWeight: '900' },
+  disconnectBtn: {
+    borderRadius: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,130,130,0.32)',
+    backgroundColor: 'rgba(255,105,105,0.12)',
+  },
+  disconnectText: {
+    color: '#ffd5d5',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  wearableNote: {
+    marginTop: 8,
+    color: '#a8ddff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  wearableError: {
+    marginTop: 6,
+    color: '#ffc8c8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   sampleWorkoutToggle: {
     marginBottom: 10,
     paddingHorizontal: 12,

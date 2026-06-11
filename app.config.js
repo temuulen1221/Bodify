@@ -83,7 +83,7 @@ export default ({ config }) => ({
       ...config?.extra,
       stravaClientId: process.env.STRAVA_CLIENT_ID ?? '',
       stravaClientSecret: process.env.STRAVA_CLIENT_SECRET ?? '',
-      spoonacularApiKey: process.env.SPOONACULAR_API_KEY ?? '',
+      spoonacularApiKey: process.env.SPOONACULAR_API_KEY || '6e98d55344b8493198a5271b06202a3c',
       exerciseDbApiKey: process.env.EXERCISEDB_API_KEY ?? '',
       exerciseDbApiHost: process.env.EXERCISEDB_API_HOST ?? 'exercisedb.p.rapidapi.com',
       exerciseDbBaseUrl: process.env.EXERCISEDB_BASE_URL ?? 'https://exercisedb.p.rapidapi.com',

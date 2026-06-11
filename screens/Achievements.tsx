@@ -222,31 +222,39 @@ function AchievementsScreen() {
               <Text style={styles.rewardFeedTitle}>Recent Awards</Text>
               <Text style={styles.rewardFeedSubtitle}>Workouts, quests, streaks, and level-ups now feed one reward timeline.</Text>
             </View>
-            {recentRewards.length ? recentRewards.map((reward: any) => (
-              <View key={reward.id} style={styles.rewardRow}>
-                <View style={styles.rewardIconWrap}>
-                  <Icon
-                    name={reward.source === 'level_up' ? 'star-four-points' : reward.source === 'badge_level' ? 'shield-star' : reward.source === 'streak' ? 'fire' : reward.source === 'quest' ? 'flag-checkered' : reward.source === 'steps' ? 'shoe-print' : 'dumbbell'}
-                    size={16}
-                    color="#12D9FF"
-                  />
+            <ScrollView
+              style={styles.rewardFeedScroll}
+              contentContainerStyle={styles.rewardFeedContent}
+              scrollEnabled={recentRewards.length > 2}
+              showsVerticalScrollIndicator={recentRewards.length > 2}
+            >
+              {recentRewards.length ? recentRewards.map((reward: any) => (
+                <View key={reward.id} style={styles.rewardRow}>
+                  <View style={styles.rewardIconWrap}>
+                    <Icon
+                      name={reward.source === 'level_up' ? 'star-four-points' : reward.source === 'badge_level' ? 'shield-star' : reward.source === 'streak' ? 'fire' : reward.source === 'quest' ? 'flag-checkered' : reward.source === 'steps' ? 'shoe-print' : 'dumbbell'}
+                      size={16}
+                      color="#12D9FF"
+                    />
+                  </View>
+                  <View style={styles.rewardCopy}>
+                    <Text style={styles.rewardTitle}>{reward.title || 'Reward unlocked'}</Text>
+                    <Text style={styles.rewardSubtitle}>{reward.subtitle || 'Progress synced to your profile'}</Text>
+                  </View>
+                  <View style={styles.rewardMeta}>
+                    <Text style={styles.rewardXp}>{reward.xp > 0 ? `+${reward.xp} XP` : 'Milestone'}</Text>
+                    <Text style={styles.rewardTime}>{formatRewardTimestamp(reward.createdAt)}</Text>
+                  </View>
                 </View>
-                <View style={styles.rewardCopy}>
-                  <Text style={styles.rewardTitle}>{reward.title || 'Reward unlocked'}</Text>
-                  <Text style={styles.rewardSubtitle}>{reward.subtitle || 'Progress synced to your profile'}</Text>
+              )) : (
+                <View style={styles.rewardEmptyState}>
+                  <Text style={styles.rewardEmptyTitle}>No recent awards yet</Text>
+                  <Text style={styles.rewardEmptySubtitle}>Complete a workout or quest to populate the progression feed.</Text>
                 </View>
-                <View style={styles.rewardMeta}>
-                  <Text style={styles.rewardXp}>{reward.xp > 0 ? `+${reward.xp} XP` : 'Milestone'}</Text>
-                  <Text style={styles.rewardTime}>{formatRewardTimestamp(reward.createdAt)}</Text>
-                </View>
-              </View>
-            )) : (
-              <View style={styles.rewardEmptyState}>
-                <Text style={styles.rewardEmptyTitle}>No recent awards yet</Text>
-                <Text style={styles.rewardEmptySubtitle}>Complete a workout or quest to populate the progression feed.</Text>
-              </View>
-            )}
+              )}
+            </ScrollView>
           </View>
+
         </View>
 
         <View style={styles.sectionHeaderBlock}>
@@ -706,6 +714,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 4,
     lineHeight: 16,
+  },
+  rewardFeedScroll: {
+    maxHeight: 160,
+  },
+  rewardFeedContent: {
+    flexGrow: 1,
   },
   // detail hint styles removed
   inlineDetailHeader: {

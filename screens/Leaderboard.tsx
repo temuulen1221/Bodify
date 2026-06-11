@@ -1,7 +1,9 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { addDoc, collection } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 import { db } from '../services/firebase';
 import { fallbackFriends, fetchFriendsForLeaderboard } from '../utils/friendsData';
 
@@ -21,19 +23,47 @@ const ensureSelfRow = (list: any) => {
 
 export default function Leaderboard() {
   const router = useRouter();
-  const [leaders, setLeaders] = useState(() => ensureSelfRow(fallbackFriends.map(f => ({
+  const dispatch = useDispatch();
+  const kudosAvailable = useSelector((s: any) => s.user?.kudosAvailable ?? 0);
+  const [sentKudos, setSentKudos] = useState<{ [key: string]: boolean }>({});
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  
+  const [leaders, setLeaders] = useState(() => ensureSelfRow(fallbackFriends.map((f: any) => ({
     id: f.id,
     name: f.name,
     points: f.points || 800,
     avatar: f.avatar,
+    level: f.level || Math.floor(Math.random() * 25) + 1,
   }))));
   const [friendName, setFriendName] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const searchResults = friendName.trim()
-    ? leaders.filter((f: any) => f.name.toLowerCase().includes(friendName.trim().toLowerCase()))
-    : [];
+  const handleSendKudos = useCallback(
+    (friendId: string, friendName: string) => {
+      if (kudosAvailable <= 0) {
+        setFeedbackMessage('No kudos available today!');
+        setTimeout(() => setFeedbackMessage(''), 2000);
+        return;
+      }
+
+      if (sentKudos[friendId]) {
+        setFeedbackMessage(`Already sent kudos to ${friendName} today!`);
+        setTimeout(() => setFeedbackMessage(''), 2000);
+        return;
+      }
+
+      if (dispatch) {
+        dispatch({ type: 'user/sendKudos' });
+      }
+
+      setSentKudos((prev) => ({ ...prev, [friendId]: true }));
+      setFeedbackMessage(`👏 Sent kudos to ${friendName}!`);
+      setTimeout(() => setFeedbackMessage(''), 2500);
+    },
+    [kudosAvailable, sentKudos, dispatch]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -46,6 +76,7 @@ export default function Leaderboard() {
           name: f.name,
           points: f.points || 800,
           avatar: f.avatar,
+          level: f.level || Math.floor(Math.random() * 25) + 1,
         }));
         setLeaders(ensureSelfRow(normalized).sort((a: any, b: any) => b.points - a.points));
       })
@@ -66,6 +97,7 @@ export default function Leaderboard() {
         id: `local-${Date.now()}`,
         name: trimmed,
         points: 800,
+        level: Math.floor(Math.random() * 25) + 1,
         avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(trimmed.toLowerCase())}`,
       };
       return ensureSelfRow([...prev, newEntry]).sort((a: any, b: any) => b.points - a.points);
@@ -74,6 +106,7 @@ export default function Leaderboard() {
       const docRef = await addDoc(collection(db, 'friends'), {
         name: trimmed,
         points: 800,
+        level: Math.floor(Math.random() * 25) + 1,
         avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(trimmed.toLowerCase())}`,
         pushups: 0,
         plankSec: 0,
@@ -85,6 +118,7 @@ export default function Leaderboard() {
           id: docRef.id,
           name: trimmed,
           points: 800,
+          level: Math.floor(Math.random() * 25) + 1,
           avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(trimmed.toLowerCase())}`,
         };
         return ensureSelfRow([...withoutLocal, newEntry]).sort((a: any, b: any) => b.points - a.points);
@@ -107,6 +141,7 @@ export default function Leaderboard() {
   const closeAddModal = () => {
     setShowAdd(false);
     setFriendName('');
+    setSearchResults([]);
   };
 
   const handleSendRequest = async () => {
@@ -115,9 +150,11 @@ export default function Leaderboard() {
       Alert.alert('Enter a name', 'Type a friend name to send a request.');
       return;
     }
-    await addFriendToLeaderboard(trimmed);
-    Alert.alert('Request sent', `Friend request sent to ${trimmed}.`);
-    setFriendName('');
+    // Search through suggestions for matching names
+    const matches = friendSuggestions.filter(s =>
+      s.name.toLowerCase().includes(trimmed.toLowerCase())
+    );
+    setSearchResults(matches);
   };
 
   const handleBack = () => {
@@ -139,11 +176,45 @@ export default function Leaderboard() {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Leaderboard</Text>
+        <Text style={styles.title}>Leaderboard & Kudos</Text>
         <TouchableOpacity onPress={toggleAddModal} style={styles.plusButton}>
           <Text style={styles.plusText}>＋</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Kudos Budget Card */}
+      <LinearGradient
+        colors={['rgba(196,163,255,0.15)', 'rgba(18,217,255,0.08)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.kudosBudgetCard}
+      >
+        <View style={styles.kudosBudgetContent}>
+          <Text style={styles.kudosBudgetLabel}>Daily Kudos Budget</Text>
+          <View style={styles.kudosBudgetDisplay}>
+            <Text style={styles.kudosBudgetValue}>👏 {kudosAvailable}/5</Text>
+          </View>
+        </View>
+        <View style={styles.kudosBudgetDots}>
+          {[...Array(5)].map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.kudosDot,
+                i < kudosAvailable ? styles.kudosDotActive : styles.kudosDotInactive,
+              ]}
+            />
+          ))}
+        </View>
+      </LinearGradient>
+
+      {/* Feedback Message */}
+      {feedbackMessage && (
+        <View style={styles.feedbackBanner}>
+          <Text style={styles.feedbackText}>{feedbackMessage}</Text>
+        </View>
+      )}
+
       <FlatList
         data={leaders}
         keyExtractor={item => item.id}
@@ -157,14 +228,32 @@ export default function Leaderboard() {
                 <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
               </View>
             )}
-            <Text style={styles.name}>{item.name}</Text>
+            <View style={styles.nameColumn}>
+              <Text style={styles.name}>{item.name}</Text>
+              {item.level && <Text style={styles.level}>LV {item.level}</Text>}
+            </View>
             <Text style={styles.points}>{item.points} pts</Text>
+            {item.name !== 'You' && (
+              <Pressable
+                onPress={() => handleSendKudos(item.id, item.name)}
+                disabled={kudosAvailable === 0}
+                style={[
+                  styles.kudosButton,
+                  sentKudos[item.id] && styles.kudosButtonSent,
+                  kudosAvailable === 0 && styles.kudosButtonDisabled,
+                ]}
+              >
+                <Text style={styles.kudosButtonText}>
+                  {sentKudos[item.id] ? '✓' : kudosAvailable > 0 ? '👏' : '—'}
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
         contentContainerStyle={styles.listContent}
       />
       {showAdd && (
-        <View style={[styles.modalOverlay, { pointerEvents: 'box-none' }]}>
+        <View style={[styles.modalOverlay, { pointerEvents: 'box-none' } as any]}>
           <Pressable style={styles.backdrop} onPress={closeAddModal} />
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Add a friend</Text>
@@ -270,7 +359,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   backButton: {
     width: 32,
@@ -283,6 +372,66 @@ const styles = StyleSheet.create({
   backIcon: {
     color: '#1b2743',
     fontSize: 18,
+    fontWeight: '700',
+  },
+  kudosBudgetCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(196,163,255,0.16)',
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kudosBudgetContent: {
+    flex: 1,
+  },
+  kudosBudgetLabel: {
+    color: '#A7B5CD',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  kudosBudgetDisplay: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  kudosBudgetValue: {
+    color: '#12D9FF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  kudosBudgetDots: {
+    flexDirection: 'row',
+    gap: 5,
+    marginLeft: 12,
+  },
+  kudosDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  kudosDotActive: {
+    backgroundColor: '#12D9FF',
+  },
+  kudosDotInactive: {
+    backgroundColor: 'rgba(18,217,255,0.1)',
+  },
+  feedbackBanner: {
+    backgroundColor: 'rgba(18,217,255,0.15)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#12D9FF',
+  },
+  feedbackText: {
+    color: '#CFF7FF',
+    fontSize: 12,
     fontWeight: '700',
   },
   addFriendLabel: {
@@ -327,12 +476,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#13182a',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: 'rgba(0,231,255,0.18)',
-    boxShadow: '0px 6px 8px #000',
     elevation: 3,
+    gap: 8,
   },
   youRow: {
     backgroundColor: 'rgba(0,231,255,0.08)',
@@ -340,17 +489,16 @@ const styles = StyleSheet.create({
     borderColor: '#00E7FF',
   },
   rank: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    width: 32,
+    width: 28,
     color: '#00E7FF',
     textAlign: 'center',
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginLeft: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(0,231,255,0.35)',
   },
@@ -362,17 +510,48 @@ const styles = StyleSheet.create({
   avatarText: {
     color: '#d4ddff',
     fontWeight: '800',
+    fontSize: 14,
+  },
+  nameColumn: {
+    flex: 1,
   },
   name: {
-    flex: 1,
-    fontSize: 18,
+    fontSize: 15,
     color: '#e8f1ff',
-    marginLeft: 12,
+    fontWeight: '700',
+  },
+  level: {
+    fontSize: 10,
+    color: '#A7B5CD',
+    marginTop: 2,
   },
   points: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#a6ff9f',
+    minWidth: 50,
+    textAlign: 'right',
+  },
+  kudosButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: 'rgba(18,217,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(18,217,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  kudosButtonSent: {
+    backgroundColor: 'rgba(18,217,255,0.3)',
+    borderColor: 'rgba(18,217,255,0.5)',
+  },
+  kudosButtonDisabled: {
+    opacity: 0.5,
+  },
+  kudosButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   plusButton: {
     width: 32,
@@ -410,7 +589,6 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: 'rgba(0,231,255,0.25)',
-    boxShadow: '0px 10px 14px #000',
     elevation: 8,
   },
   modalTitle: {

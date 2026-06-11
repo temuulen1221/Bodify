@@ -1,5 +1,5 @@
 import { configureStore, createListenerMiddleware, createSlice } from '@reduxjs/toolkit';
-import { saveAwardsState, saveRemoteUserState, saveStepsState, saveUserState } from './services/storage';
+import { saveAwardsState, saveNotesState, saveRemoteUserState, saveStepsState, saveUserState } from './services/storage';
 import { BADGE_XP_LEVEL_STEP_BY_CATEGORY, deriveBadgeLevelFromCategoryXp } from './utils/badgeSystem';
 import { calculateDailyStepXP } from './utils/stepXP';
 import { createWorkoutSessionRecord } from './utils/workoutSessionXP';
@@ -25,34 +25,55 @@ const LEVEL_MILESTONE_REWARD_MAP = {
   5: {
     level: 5,
     title: 'Level 5 Milestone',
-    summary: 'Free premium cosmetic unlocked',
+    summary: 'Free premium cosmetic + XP Booster unlocked',
     items: ['a1'],
     tickets: 0,
     shields: 0,
+    xpBooster: { multiplier: 1.25, remainingWorkouts: 3 },
+    trophy: { id: 'lvl5-starter', title: 'Rising Star', description: 'Reached Level 5' },
   },
   10: {
     level: 10,
     title: 'Level 10 Milestone',
-    summary: 'Discount ticket and rare accessory unlocked',
+    summary: 'Rare accessory + Energy Regen Token + Title',
     items: ['a4'],
     tickets: 1,
     shields: 0,
+    energyRegenToken: 1,
+    title: { id: 'lvl10-climber', title: 'Achievement Climber' },
   },
   15: {
     level: 15,
     title: 'Level 15 Milestone',
-    summary: 'Badge unlock and streak protection awarded',
+    summary: 'Badge unlock + Streak protection + Skill Badge',
     items: ['a5'],
     tickets: 1,
     shields: 1,
+    skillBadge: { id: 'skill-lvl15', category: 'Endurance', level: 1 },
+    trophy: { id: 'lvl15-iron', title: 'Iron Will', description: 'Reached Level 15' },
   },
   20: {
     level: 20,
     title: 'Level 20 Milestone',
-    summary: 'Premium course unlock and reward bundle awarded',
+    summary: 'Premium course + Challenge Tier + Challenge Points',
     items: ['o2'],
     tickets: 1,
     shields: 1,
+    challengeTier: 2,
+    challengePoints: 20,
+    trophy: { id: 'lvl20-legend', title: 'Legend', description: 'Reached Level 20' },
+  },
+  30: {
+    level: 30,
+    title: 'Level 30 Milestone',
+    summary: 'Exclusive workout program + 2x XP Booster',
+    items: ['o3'],
+    tickets: 2,
+    shields: 2,
+    xpBooster: { multiplier: 2.0, remainingWorkouts: 5, durationMs: 48 * 60 * 60 * 1000 },
+    workoutProgram: { id: 'prog-advanced', name: 'Advanced Conditioning' },
+    challengeTier: 3,
+    title: { id: 'lvl30-master', title: 'Master Trainer' },
   },
 };
 
@@ -281,6 +302,23 @@ const initialState = {
   lastBadgeLevelUpReward: null,
   lastBadgeLevelUpSeenAt: null,
   levelUpPreviewReward: null,
+  // New Reward Systems
+  // Boosters: temporary multipliers and regeneration tokens
+  xpBoosters: [], // [{ id, expiresAt, multiplier (e.g., 1.5), remainingWorkouts }]
+  energyRegenTokens: 0, // number of energy refill tokens
+  streakMultiplier: 1, // base streak multiplier
+  // Trophies & Titles: visual collections and profile customization
+  unlockedTrophies: [], // [{ id, unlockedAt, title, description }]
+  unlockedTitles: [], // [{ id, title, unlocked }]
+  selectedTitle: null, // currently displayed title on profile
+  // Social: kudos and challenge points
+  kudosAvailable: 0, // daily budget of kudos to send
+  kudosReceived: 0, // lifetime kudos count
+  challengePoints: 0, // spend to create challenges
+  // Progression: skill badges and challenge tiers
+  skillBadges: [], // [{ id, category, level, unlockedAt }]
+  currentChallengeTier: 1, // unlocked difficulty level
+  unlockedWorkoutPrograms: [], // [{ id, programName, unlockedAt }]
   // Profile fields
   avatarName: '',
   height: '',
@@ -331,6 +369,141 @@ const userSlice = createSlice({
       if (amount <= 0) return;
       state.energy = Math.max(0, Math.floor(Number(state.energy) || 0) - amount);
     },
+    // New Booster Reducers
+    addXPBooster(state, action) {
+      const { multiplier = 1.5, remainingWorkouts = 3, durationMs = 24 * 60 * 60 * 1000 } = action.payload || {};
+      const booster = {
+        id: `xp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        expiresAt: Date.now() + durationMs,
+        multiplier: Math.max(1, Number(multiplier) || 1.5),
+        remainingWorkouts: Math.max(1, Math.floor(Number(remainingWorkouts) || 3)),
+      };
+      state.xpBoosters = (Array.isArray(state.xpBoosters) ? state.xpBoosters : []).concat(booster);
+    },
+    consumeXPBooster(state, action) {
+      const boosterId = action.payload;
+      state.xpBoosters = (Array.isArray(state.xpBoosters) ? state.xpBoosters : [])
+        .map((b) => (b.id === boosterId ? { ...b, remainingWorkouts: Math.max(0, b.remainingWorkouts - 1) } : b))
+        .filter((b) => b.remainingWorkouts > 0 && b.expiresAt > Date.now());
+    },
+    addEnergyRegenToken(state, action) {
+      const count = Math.max(1, Math.floor(Number(action.payload) || 1));
+      state.energyRegenTokens = Math.max(0, Math.floor(Number(state.energyRegenTokens) || 0)) + count;
+    },
+    useEnergyRegenToken(state) {
+      state.energyRegenTokens = Math.max(0, Math.floor(Number(state.energyRegenTokens) || 0) - 1);
+      state.energy = Math.max(0, Math.floor(Number(state.energy) || 0)) + 50; // regen 50 energy
+    },
+    // Trophy & Title Reducers
+    unlockTrophy(state, action) {
+      const trophy = {
+        id: action.payload?.id || `trophy-${Date.now()}`,
+        unlockedAt: Date.now(),
+        title: action.payload?.title || 'Achievement',
+        description: action.payload?.description || '',
+      };
+      const existing = Array.isArray(state.unlockedTrophies) ? state.unlockedTrophies : [];
+      if (!existing.some((t) => t.id === trophy.id)) {
+        state.unlockedTrophies = existing.concat(trophy);
+        pushRecentReward(state, {
+          source: 'trophy_unlock',
+          xp: 0,
+          title: `🏆 ${trophy.title} Trophy Unlocked`,
+          subtitle: trophy.description,
+        });
+      }
+    },
+    unlockTitle(state, action) {
+      const titleId = action.payload?.id || `title-${Date.now()}`;
+      const titleName = action.payload?.title || 'Honorary';
+      const existing = Array.isArray(state.unlockedTitles) ? state.unlockedTitles : [];
+      if (!existing.some((t) => t.id === titleId)) {
+        state.unlockedTitles = existing.concat({ id: titleId, title: titleName, unlocked: true });
+        pushRecentReward(state, {
+          source: 'title_unlock',
+          xp: 0,
+          title: `⭐ Title Unlocked: ${titleName}`,
+          subtitle: 'Add to your profile',
+        });
+      }
+    },
+    selectTitle(state, action) {
+      state.selectedTitle = action.payload || null;
+    },
+    // Social & Challenge Reducers
+    addKudos(state, action) {
+      const count = Math.max(1, Math.floor(Number(action.payload) || 1));
+      state.kudosReceived = Math.max(0, Math.floor(Number(state.kudosReceived) || 0)) + count;
+      pushRecentReward(state, {
+        source: 'kudos',
+        xp: 0,
+        title: `👏 Received ${count} Kudos!`,
+        subtitle: 'Friends are cheering you on',
+      });
+    },
+    resetDailyKudosBudget(state, action) {
+      const dailyBudget = Math.floor(Number(action.payload) || 5);
+      state.kudosAvailable = Math.max(0, dailyBudget);
+    },
+    sendKudos(state) {
+      state.kudosAvailable = Math.max(0, Math.floor(Number(state.kudosAvailable) || 0) - 1);
+    },
+    addChallengePoints(state, action) {
+      const points = Math.max(1, Math.floor(Number(action.payload) || 1));
+      state.challengePoints = Math.max(0, Math.floor(Number(state.challengePoints) || 0)) + points;
+    },
+    spendChallengePoints(state, action) {
+      const cost = Math.max(1, Math.floor(Number(action.payload) || 10));
+      state.challengePoints = Math.max(0, Math.floor(Number(state.challengePoints) || 0) - cost);
+    },
+    // Skill Badge & Progression Reducers
+    unlockSkillBadge(state, action) {
+      const badge = {
+        id: action.payload?.id || `skill-${Date.now()}`,
+        category: action.payload?.category || 'general',
+        level: Math.max(1, Math.floor(Number(action.payload?.level) || 1)),
+        unlockedAt: Date.now(),
+      };
+      const existing = Array.isArray(state.skillBadges) ? state.skillBadges : [];
+      if (!existing.some((b) => b.id === badge.id)) {
+        state.skillBadges = existing.concat(badge);
+        pushRecentReward(state, {
+          source: 'skill_badge',
+          xp: 10,
+          title: `🎖️ Skill Badge: ${badge.category}`,
+          subtitle: `Level ${badge.level} mastery`,
+        });
+      }
+    },
+    unlockChallengeTier(state, action) {
+      const tier = Math.max(1, Math.floor(Number(action.payload) || 1));
+      if (tier > Math.max(1, Math.floor(Number(state.currentChallengeTier) || 1))) {
+        state.currentChallengeTier = tier;
+        pushRecentReward(state, {
+          source: 'challenge_tier',
+          xp: 0,
+          title: `🎯 Challenge Tier ${tier} Unlocked`,
+          subtitle: 'Try harder workouts',
+        });
+      }
+    },
+    unlockWorkoutProgram(state, action) {
+      const program = {
+        id: action.payload?.id || `program-${Date.now()}`,
+        programName: action.payload?.name || 'Program',
+        unlockedAt: Date.now(),
+      };
+      const existing = Array.isArray(state.unlockedWorkoutPrograms) ? state.unlockedWorkoutPrograms : [];
+      if (!existing.some((p) => p.id === program.id)) {
+        state.unlockedWorkoutPrograms = existing.concat(program);
+        pushRecentReward(state, {
+          source: 'workout_program',
+          xp: 0,
+          title: `📚 New Program: ${program.programName}`,
+          subtitle: 'Exclusive workout plan unlocked',
+        });
+      }
+    },
     showLevelUpPreview(state, action) {
       const payload = action.payload || {};
       const targetLevel = Math.max(2, Math.floor(Number(payload.level) || Math.max(5, Number(state.level || 1) + 1)));
@@ -362,6 +535,66 @@ const userSlice = createSlice({
           }
           if (Array.isArray(milestoneReward.items) && milestoneReward.items.length > 0) {
             state.ownedShopItems = mergeOwnedShopItems(state.ownedShopItems, milestoneReward.items);
+          }
+          // New Reward Type Processing
+          if (milestoneReward.xpBooster) {
+            state.xpBoosters = (Array.isArray(state.xpBoosters) ? state.xpBoosters : []).concat({
+              id: `xp-${lvl}-${Date.now()}`,
+              expiresAt: Date.now() + (milestoneReward.xpBooster.durationMs || 24 * 60 * 60 * 1000),
+              multiplier: Math.max(1, Number(milestoneReward.xpBooster.multiplier) || 1.5),
+              remainingWorkouts: Math.max(1, Math.floor(Number(milestoneReward.xpBooster.remainingWorkouts) || 3)),
+            });
+          }
+          if (milestoneReward.energyRegenToken && milestoneReward.energyRegenToken > 0) {
+            state.energyRegenTokens = Math.max(0, Math.floor(Number(state.energyRegenTokens) || 0)) + milestoneReward.energyRegenToken;
+          }
+          if (milestoneReward.trophy) {
+            const trophy = milestoneReward.trophy;
+            const existing = Array.isArray(state.unlockedTrophies) ? state.unlockedTrophies : [];
+            if (!existing.some((t) => t.id === trophy.id)) {
+              state.unlockedTrophies = existing.concat({
+                id: trophy.id,
+                unlockedAt: Date.now(),
+                title: trophy.title,
+                description: trophy.description,
+              });
+            }
+          }
+          if (milestoneReward.title) {
+            const titleData = milestoneReward.title;
+            const existing = Array.isArray(state.unlockedTitles) ? state.unlockedTitles : [];
+            if (!existing.some((t) => t.id === titleData.id)) {
+              state.unlockedTitles = existing.concat({ id: titleData.id, title: titleData.title, unlocked: true });
+            }
+          }
+          if (milestoneReward.skillBadge) {
+            const badge = milestoneReward.skillBadge;
+            const existing = Array.isArray(state.skillBadges) ? state.skillBadges : [];
+            if (!existing.some((b) => b.id === badge.id)) {
+              state.skillBadges = existing.concat({
+                id: badge.id,
+                category: badge.category,
+                level: Math.max(1, Math.floor(Number(badge.level) || 1)),
+                unlockedAt: Date.now(),
+              });
+            }
+          }
+          if (milestoneReward.challengeTier && milestoneReward.challengeTier > state.currentChallengeTier) {
+            state.currentChallengeTier = milestoneReward.challengeTier;
+          }
+          if (milestoneReward.challengePoints && milestoneReward.challengePoints > 0) {
+            state.challengePoints = Math.max(0, Math.floor(Number(state.challengePoints) || 0)) + milestoneReward.challengePoints;
+          }
+          if (milestoneReward.workoutProgram) {
+            const program = milestoneReward.workoutProgram;
+            const existing = Array.isArray(state.unlockedWorkoutPrograms) ? state.unlockedWorkoutPrograms : [];
+            if (!existing.some((p) => p.id === program.id)) {
+              state.unlockedWorkoutPrograms = existing.concat({
+                id: program.id,
+                programName: program.name,
+                unlockedAt: Date.now(),
+              });
+            }
           }
           milestoneRewards.push({
             ...milestoneReward,
@@ -588,7 +821,15 @@ const userSlice = createSlice({
   },
 });
 
-export const { setPoints, setLevel, setPointsMax, setEnergy, addOwnedShopItem, consumeDiscountTicket, spendEnergy, showLevelUpPreview, addXP, addBadgeXP, dismissLevelUpModal, dismissBadgeLevelUpModal, registerWorkoutDay, setProfile, setAvatar, setSelectedBadgeKey, hydrateUser } = userSlice.actions;
+export const {
+  // Original
+  setPoints, setLevel, setPointsMax, setEnergy, addOwnedShopItem, consumeDiscountTicket, spendEnergy, showLevelUpPreview, addXP, addBadgeXP, dismissLevelUpModal, dismissBadgeLevelUpModal, registerWorkoutDay, setProfile, setAvatar, setSelectedBadgeKey, hydrateUser,
+  // New Reward Systems
+  addXPBooster, consumeXPBooster, addEnergyRegenToken, useEnergyRegenToken,
+  unlockTrophy, unlockTitle, selectTitle,
+  addKudos, resetDailyKudosBudget, sendKudos, addChallengePoints, spendChallengePoints,
+  unlockSkillBadge, unlockChallengeTier, unlockWorkoutProgram,
+} = userSlice.actions;
 // --- Quests slice to track daily completions and XP awards (YYYY-MM-DD => true) ---
 const questsSlice = createSlice({
   name: 'quests',
@@ -673,6 +914,10 @@ const workoutsSlice = createSlice({
         const { date, session } = action.payload || {};
         if (!date || typeof date !== 'string' || date.length !== 10) return;
         if (!state.sessionsByDate[date]) state.sessionsByDate[date] = [];
+        const sessionId = String(session?.id || '').trim();
+        if (sessionId && state.sessionsByDate[date].some((existingSession) => String(existingSession?.id || '').trim() === sessionId)) {
+          return;
+        }
         state.sessionsByDate[date].push(session);
       },
       prepare(payload) {
@@ -768,6 +1013,53 @@ const poseSlice = createSlice({
   },
 });
 
+const notesSlice = createSlice({
+  name: 'notes',
+  initialState: {
+    notesByDate: {},      // { 'YYYY-MM-DD': string }
+    remindersByDate: {},  // { 'YYYY-MM-DD': [{id, title, time, done}] }
+  },
+  reducers: {
+    hydrateNotes(state, action) {
+      const { notesByDate, remindersByDate } = action.payload || {};
+      if (notesByDate && typeof notesByDate === 'object') state.notesByDate = { ...state.notesByDate, ...notesByDate };
+      if (remindersByDate && typeof remindersByDate === 'object') state.remindersByDate = { ...state.remindersByDate, ...remindersByDate };
+    },
+    setDayNote(state, action) {
+      const { date, text } = action.payload || {};
+      if (!date) return;
+      if (!text || !String(text).trim()) {
+        delete state.notesByDate[date];
+      } else {
+        state.notesByDate[date] = String(text);
+      }
+    },
+    addReminder(state, action) {
+      const { date, reminder } = action.payload || {};
+      if (!date || !reminder) return;
+      if (!Array.isArray(state.remindersByDate[date])) state.remindersByDate[date] = [];
+      state.remindersByDate[date].push({
+        id: String(reminder.id || Date.now()),
+        title: String(reminder.title || 'Reminder'),
+        time: String(reminder.time || ''),
+        done: false,
+      });
+    },
+    toggleReminder(state, action) {
+      const { date, id } = action.payload || {};
+      const list = state.remindersByDate[date];
+      if (!Array.isArray(list)) return;
+      const item = list.find((r) => r.id === id);
+      if (item) item.done = !item.done;
+    },
+    deleteReminder(state, action) {
+      const { date, id } = action.payload || {};
+      if (!Array.isArray(state.remindersByDate[date])) return;
+      state.remindersByDate[date] = state.remindersByDate[date].filter((r) => r.id !== id);
+    },
+  },
+});
+
 workoutSessionRewardsListener.startListening({
   actionCreator: addWorkoutSession,
   effect: async (action, listenerApi) => {
@@ -840,18 +1132,21 @@ const store = configureStore({
     workouts: workoutsSlice.reducer,
     steps: stepsSlice.reducer,
     pose: poseSlice.reducer,
+    notes: notesSlice.reducer,
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware().prepend(workoutSessionRewardsListener.middleware),
 });
 
 export default store;
 export const { setPoseExercise, incrementPoseRep, resetPoseSession, setCameraTrackingEnabled, acceptPrivacy, setFormFeedback } = poseSlice.actions;
+export const { hydrateNotes, setDayNote, addReminder, toggleReminder, deleteReminder } = notesSlice.actions;
 
 // --- Persistence subscription: save a lightweight user subset on changes ---
 try {
   let lastSavedJson = '';
   let lastAwardsJson = '';
   let lastStepsJson = '';
+  let lastNotesJson = '';
   let remoteUserSaveTimer = null;
   store.subscribe(() => {
     const state = store.getState();
@@ -932,6 +1227,16 @@ try {
     if (stepsJson !== lastStepsJson) {
       lastStepsJson = stepsJson;
       saveStepsState(stepsSubset);
+    }
+
+    const notesSubset = {
+      notesByDate: state.notes?.notesByDate ?? {},
+      remindersByDate: state.notes?.remindersByDate ?? {},
+    };
+    const notesJson = JSON.stringify(notesSubset);
+    if (notesJson !== lastNotesJson) {
+      lastNotesJson = notesJson;
+      saveNotesState(notesSubset);
     }
   });
 } catch (_) {

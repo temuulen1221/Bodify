@@ -5,6 +5,7 @@ import { auth, db } from './firebase';
 const USER_KEY = 'bodify:user@v1';
 const AWARDS_KEY = 'bodify:awards@v1';
 const STEPS_KEY = 'bodify:steps@v1';
+const NOTES_KEY = 'bodify:notes@v1';
 const DEFAULT_AVATAR_MODEL = 'AvatarSample_M.vrm';
 
 const hasOwnKeys = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0);
@@ -238,5 +239,30 @@ export async function clearStepsState() {
     await AsyncStorage.removeItem(STEPS_KEY);
   } catch (err) {
     console.warn('[storage] clearStepsState failed', err);
+  }
+}
+
+export async function loadNotesState() {
+  try {
+    const s = await AsyncStorage.getItem(NOTES_KEY);
+    if (!s) return null;
+    const parsed = JSON.parse(s);
+    if (parsed && typeof parsed === 'object') return parsed;
+    return null;
+  } catch (err) {
+    console.warn('[storage] loadNotesState failed', err);
+    return null;
+  }
+}
+
+export async function saveNotesState(notes) {
+  try {
+    const subset = {
+      notesByDate: notes?.notesByDate ?? {},
+      remindersByDate: notes?.remindersByDate ?? {},
+    };
+    await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(subset));
+  } catch (err) {
+    console.warn('[storage] saveNotesState failed', err);
   }
 }

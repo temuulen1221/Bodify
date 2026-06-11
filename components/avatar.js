@@ -420,15 +420,6 @@ const Avatar = forwardRef(function Avatar({ height = '175', weight = '70', gende
     // Blank 1×1 PNG used as a safe placeholder for embedded textures on iOS/Expo Go.
     const _blankPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
 
-    // THREE.js GLTFLoader (r180) runs `navigator.userAgent.match(...)` inside GLTFParser's
-    // constructor to detect Safari/Firefox. In React Native (Hermes/iOS), `navigator` is a
-    // global object but `navigator.userAgent` is undefined → TypeError: Cannot read property
-    // 'match' of undefined. Patch it to a neutral string before instantiating GLTFLoader.
-    const _origUserAgent = global.navigator ? global.navigator.userAgent : undefined;
-    if (global.navigator && !global.navigator.userAgent) {
-      try { global.navigator.userAgent = 'ReactNative'; } catch (_) {}
-    }
-
     // Patch URL.createObjectURL at BOTH global and module scope before GLTFLoader uses it.
     // On iOS Expo Go (Hermes), the module-level URL may differ from global.URL.
     // Returning a blank data URI instead of a blob: URL prevents the downstream
@@ -673,13 +664,6 @@ const Avatar = forwardRef(function Avatar({ height = '175', weight = '70', gende
         else delete global.URL.createObjectURL;
         if (typeof originalRevokeObjectURL === 'function') global.URL.revokeObjectURL = originalRevokeObjectURL;
         else delete global.URL.revokeObjectURL;
-      }
-      // Restore navigator.userAgent
-      if (global.navigator) {
-        try {
-          if (typeof _origUserAgent !== 'undefined') global.navigator.userAgent = _origUserAgent;
-          else delete global.navigator.userAgent;
-        } catch (_) {}
       }
     }
   }, [gender, model, onVrmLoad, playAnimation, playResolvedClip, updateModelFromProps]);

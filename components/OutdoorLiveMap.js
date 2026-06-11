@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 const DEFAULT_DELTA = 0.01;
@@ -145,7 +145,19 @@ export default function OutdoorLiveMap({
           />
         ) : null}
         {markerPoint ? (
-          <Marker coordinate={markerPoint} title="Current location" pinColor="#7a5cff" />
+          <Marker
+            coordinate={markerPoint}
+            title="Current location"
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+          >
+            <View style={styles.avatarMarkerWrap}>
+              <View style={styles.avatarMarkerHalo} />
+              <View style={styles.avatarMarkerCore}>
+                <Text style={styles.avatarMarkerGlyph}>🧍</Text>
+              </View>
+            </View>
+          </Marker>
         ) : null}
         {currentFix && destinationPoint ? (
           <Polyline
@@ -191,5 +203,33 @@ const styles = StyleSheet.create({
   map: {
     width: '100%',
     height: '100%',
+  },
+  avatarMarkerWrap: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarMarkerHalo: {
+    position: 'absolute',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(122,92,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,234,255,0.45)',
+  },
+  avatarMarkerCore: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#7a5cff',
+    borderWidth: 2,
+    borderColor: '#e8f6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarMarkerGlyph: {
+    fontSize: 14,
   },
 });

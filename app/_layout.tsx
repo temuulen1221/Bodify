@@ -11,8 +11,8 @@ import LevelUpRewardModal from '../components/LevelUpRewardModal';
 import { ensureBackgroundStepTaskRegistered } from '../services/backgroundSteps';
 import { auth } from '../services/firebase';
 import { startGlobalStepTracking } from '../services/stepsService';
-import { loadAwardsState, loadRemoteUserState, loadStepsState, loadUserState, mergeHydratedUserState } from '../services/storage';
-import store, { hydrateQuests, hydrateSteps, hydrateUser, hydrateWorkouts } from '../store';
+import { loadAwardsState, loadNotesState, loadRemoteUserState, loadStepsState, loadUserState, mergeHydratedUserState } from '../services/storage';
+import store, { hydrateNotes, hydrateQuests, hydrateSteps, hydrateUser, hydrateWorkouts } from '../store';
 
 // Suppress known benign warnings
 LogBox.ignoreLogs([
@@ -217,6 +217,8 @@ export default function RootLayout() {
         if (awards?.workouts) dispatch(hydrateWorkouts(awards.workouts));
         const steps = await loadStepsState();
         if (steps) dispatch(hydrateSteps(steps));
+        const notes = await loadNotesState();
+        if (notes) dispatch(hydrateNotes(notes));
         // Register background step tracking task (no-op on web)
         try { if (Platform.OS !== 'web') await ensureBackgroundStepTaskRegistered(); } catch {}
         stopStepTracking = startGlobalStepTracking(dispatch);

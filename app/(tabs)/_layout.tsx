@@ -299,6 +299,8 @@ export default function TabsLayout() {
           <Tabs.Screen name="diet" options={{ href: null }} />
         <Tabs.Screen name="social" options={{ href: null }} />
         <Tabs.Screen name="achievements" options={{ href: null }} />
+        <Tabs.Screen name="trophies" options={{ href: null }} />
+        <Tabs.Screen name="kudos" options={{ href: null }} />
       </Tabs>
     </ScreenFrame>
   );

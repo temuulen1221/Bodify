@@ -30,7 +30,18 @@ const BackButton = ({ label: _label = 'Back', onPress = undefined }) => {
     }
 
     const fallbackRoute = FALLBACK_ROUTES[pathname] || '/(tabs)/Home';
-    router?.replace?.(fallbackRoute) || router?.push?.(fallbackRoute) || nav?.navigate?.('Home');
+    if (typeof router?.replace === 'function') {
+      router.replace(fallbackRoute);
+      return;
+    }
+    if (typeof router?.push === 'function') {
+      router.push(fallbackRoute);
+      return;
+    }
+    if (typeof nav?.navigate === 'function') {
+      nav.navigate('Home');
+      return;
+    }
   };
 
   return (

@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import Svg, { Polyline as SvgPolyline } from 'react-native-svg';
 import { useDispatch } from 'react-redux';
 import BackButton from '../components/BackButton';
 import { fetchGoogleRoute, fetchPlaceAutocomplete, resolvePlaceDestination } from '../services/googleRoutes';
@@ -48,6 +49,11 @@ type FinishSummary = {
   distanceKm: number;
   durationMin: number;
   calories: number;
+  avgPace: string;
+  avgSpeed: string;
+  elevationGain: string;
+  routeSparkline: string;
+  splits: { km: number; pace: string }[];
   date: string;
   session: ReturnType<typeof createWorkoutSessionRecord> & { awardedXP?: number };
 };
@@ -179,6 +185,77 @@ const getManeuverIconName = (maneuver: string): string => {
   return 'arrow-forward';
 };
 
+const buildRouteSparkline = (points: LocationPoint[]): string => {
+  if (!Array.isArray(points) || points.length < 2) return '';
+  const sampleCount = Math.max(2, Math.min(42, points.length));
+  const sampled = [];
+  for (let i = 0; i < sampleCount; i += 1) {
+    const index = Math.min(points.length - 1, Math.floor((i * (points.length - 1)) / (sampleCount - 1)));
+    sampled.push(points[index]);
+  }
+
+  const latitudes = sampled.map((point) => Number(point.latitude) || 0);
+  const longitudes = sampled.map((point) => Number(point.longitude) || 0);
+  const minLat = Math.min(...latitudes);
+  const maxLat = Math.max(...latitudes);
+  const minLng = Math.min(...longitudes);
+  const maxLng = Math.max(...longitudes);
+  const latSpan = Math.max(0.000001, maxLat - minLat);
+  const lngSpan = Math.max(0.000001, maxLng - minLng);
+
+  return sampled
+    .map((point) => {
+      const x = 6 + (((Number(point.longitude) || 0) - minLng) / lngSpan) * 108;
+      const y = 50 - (((Number(point.latitude) || 0) - minLat) / latSpan) * 42;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+};
+
+const buildKilometerSplits = (points: LocationPoint[]) => {
+  if (!Array.isArray(points) || points.length < 2) return [];
+  const splitTargets = [];
+  let totalMeters = 0;
+  const segments = [];
+
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const segmentMeters = getDistanceInMeters(start, end);
+    const segmentMs = Math.max(0, (Number(end.timestamp) || 0) - (Number(start.timestamp) || 0));
+    if (segmentMeters <= 0 || segmentMs <= 0) continue;
+    const previousTotal = totalMeters;
+    totalMeters += segmentMeters;
+    segments.push({ previousTotal, totalMeters, segmentMeters, segmentMs });
+  }
+
+  const fullKmCount = Math.floor(totalMeters / 1000);
+  if (fullKmCount <= 0) return [];
+
+  let elapsedMsAtPreviousSplit = 0;
+  for (let km = 1; km <= fullKmCount; km += 1) {
+    const targetMeters = km * 1000;
+    const segment = segments.find((item) => item.totalMeters >= targetMeters);
+    if (!segment) continue;
+
+    const metersIntoSegment = targetMeters - segment.previousTotal;
+    const ratio = metersIntoSegment / Math.max(1, segment.segmentMeters);
+    const elapsedMsAtSplit = elapsedMsAtPreviousSplit === 0 && km === 1
+      ? segments
+        .filter((item) => item.totalMeters <= segment.previousTotal)
+        .reduce((sum, item) => sum + item.segmentMs, 0) + segment.segmentMs * ratio
+      : segments
+        .filter((item) => item.totalMeters <= segment.previousTotal)
+        .reduce((sum, item) => sum + item.segmentMs, 0) + segment.segmentMs * ratio;
+
+    const splitDurationMs = Math.max(1, elapsedMsAtSplit - elapsedMsAtPreviousSplit);
+    splitTargets.push({ km, pace: formatPace(1000, splitDurationMs) });
+    elapsedMsAtPreviousSplit = elapsedMsAtSplit;
+  }
+
+  return splitTargets;
+};
+
 
 export default function OutdoorTracker() {
   const params = useLocalSearchParams();
@@ -214,6 +291,7 @@ export default function OutdoorTracker() {
   const [placeSearchLoading, setPlaceSearchLoading] = useState(false);
   const [placeSearchError, setPlaceSearchError] = useState('');
   const [finishSummary, setFinishSummary] = useState<FinishSummary | null>(null);
+  const [routePreviewVisible, setRoutePreviewVisible] = useState(false);
 
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const liveStartRef = useRef<number | null>(null);
@@ -542,10 +620,15 @@ export default function OutdoorTracker() {
     const finalElapsed = trackingState === 'tracking'
       ? pausedElapsedRef.current + Math.max(0, Date.now() - (liveStartRef.current || Date.now()))
       : pausedElapsedRef.current;
+    const meetsMinimumSession = distanceMeters >= 20 || finalElapsed >= 30000;
+    if (!meetsMinimumSession) return;
+
     const durationMin = Math.max(1, Math.round((finalElapsed / 60000) * 10) / 10);
     const distanceKm = Math.round((distanceMeters / 1000) * 100) / 100;
 
     stopWatching();
+    pausedElapsedRef.current = finalElapsed;
+    liveStartRef.current = null;
     setElapsedMs(finalElapsed);
     setTrackingState('paused');
 
@@ -567,10 +650,16 @@ export default function OutdoorTracker() {
       distanceKm,
       durationMin,
       calories: sessionRecord.calories,
+      avgPace: formatPace(distanceMeters, finalElapsed),
+      avgSpeed: formatSpeed(finalElapsed > 0 ? distanceMeters / Math.max(1, finalElapsed / 1000) : 0),
+      elevationGain: formatElevation(elevationGainMeters),
+      routeSparkline: buildRouteSparkline(routePoints),
+      splits: buildKilometerSplits(routePoints),
     });
-  }, [caloriesPerMinute, distanceMeters, finishSummary, hasSavedSession, label, stopWatching, trackingState, type]);
+  }, [caloriesPerMinute, distanceMeters, elevationGainMeters, finishSummary, hasSavedSession, label, routePoints, stopWatching, trackingState, type]);
 
   const handleFinishCancel = useCallback(() => {
+    setRoutePreviewVisible(false);
     setFinishSummary(null);
   }, []);
 
@@ -614,6 +703,7 @@ export default function OutdoorTracker() {
   const handleFinishConfirm = useCallback(() => {
     if (!finishSummary?.session || !finishSummary?.date || hasSavedSession) return;
 
+    setRoutePreviewVisible(false);
     setHasSavedSession(true);
     dispatch(
       addWorkoutSession({
@@ -813,6 +903,7 @@ export default function OutdoorTracker() {
       : destinationPoint
         ? `${stopCount > 1 ? `${stopCount} stops pinned` : 'Destination pinned'}`
         : 'No route planned';
+  const canFinishSession = trackingState !== 'idle' && !hasSavedSession && (distanceMeters >= 20 || elapsedMs >= 30000);
 
   return (
     <View style={styles.container}>
@@ -938,12 +1029,12 @@ export default function OutdoorTracker() {
                   )}
 
                   <Pressable
-                    disabled={trackingState === 'tracking' || (distanceMeters < 20 && elapsedMs < 30000)}
+                    disabled={!canFinishSession}
                     onPress={finishTracking}
                     style={({ pressed }) => [
                       styles.headerFinishAction,
-                      (trackingState === 'tracking' || (distanceMeters < 20 && elapsedMs < 30000)) && styles.finishActionDisabled,
-                      pressed && trackingState !== 'tracking' && !(distanceMeters < 20 && elapsedMs < 30000) && styles.buttonPressed,
+                      !canFinishSession && styles.finishActionDisabled,
+                      pressed && canFinishSession && styles.buttonPressed,
                     ]}
                   >
                     <Ionicons name="checkmark-circle" size={15} color="#dff8ff" />
@@ -1047,7 +1138,7 @@ export default function OutdoorTracker() {
         <View style={styles.finishModalOverlay}>
           <View style={styles.finishModalCard}>
             <Text style={styles.finishModalEyebrow}>Session complete</Text>
-            <Text style={styles.finishModalTitle}>Claim your track XP</Text>
+            <Text style={styles.finishModalTitle}>Session summary</Text>
             <Text style={styles.finishModalXP}>+{finishSummary?.xp || 0} XP</Text>
             <View style={styles.finishModalMetaRow}>
               <View style={styles.finishModalMetaPill}>
@@ -1063,6 +1154,55 @@ export default function OutdoorTracker() {
                 <Text style={styles.finishModalMetaValue}>{Math.round(Number(finishSummary?.calories) || 0)}</Text>
               </View>
             </View>
+            <View style={styles.finishModalMetaRow}>
+              <View style={styles.finishModalMetaPill}>
+                <Text style={styles.finishModalMetaLabel}>Avg pace</Text>
+                <Text style={styles.finishModalMetaValue}>{finishSummary?.avgPace || '--'}</Text>
+              </View>
+              <View style={styles.finishModalMetaPill}>
+                <Text style={styles.finishModalMetaLabel}>Avg speed</Text>
+                <Text style={styles.finishModalMetaValue}>{finishSummary?.avgSpeed || '--'}</Text>
+              </View>
+              <View style={styles.finishModalMetaPill}>
+                <Text style={styles.finishModalMetaLabel}>Elevation</Text>
+                <Text style={styles.finishModalMetaValue}>{finishSummary?.elevationGain || '0 m'}</Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => setRoutePreviewVisible(true)}
+              style={({ pressed }) => [styles.finishModalRouteCard, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.finishModalRouteLabel}>Route preview</Text>
+              {finishSummary?.routeSparkline ? (
+                <Svg width="120" height="56" viewBox="0 0 120 56">
+                  <SvgPolyline
+                    points={finishSummary.routeSparkline}
+                    fill="none"
+                    stroke="#00eaff"
+                    strokeWidth="2.5"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                </Svg>
+              ) : (
+                <View style={styles.finishModalRouteEmpty}>
+                  <Ionicons name="map" size={16} color="#7ca3db" />
+                  <Text style={styles.finishModalRouteEmptyText}>No route path yet</Text>
+                </View>
+              )}
+              <Text style={styles.finishModalRouteHint}>Tap to expand</Text>
+            </Pressable>
+            {finishSummary?.splits?.length ? (
+              <View style={styles.finishModalSplitsBlock}>
+                <Text style={styles.finishModalRouteLabel}>Km splits</Text>
+                {finishSummary.splits.slice(0, 5).map((split) => (
+                  <View key={`split-${split.km}`} style={styles.finishModalSplitRow}>
+                    <Text style={styles.finishModalSplitKm}>KM {split.km}</Text>
+                    <Text style={styles.finishModalSplitPace}>{split.pace}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             <Text style={styles.finishModalNote}>XP is based on your tracked session length, calories, and workout type.</Text>
             <Pressable onPress={handleShareFinishSummary} style={({ pressed }) => [styles.finishModalShareAction, pressed && styles.buttonPressed]}>
               <Ionicons name="share-social" size={16} color="#dff8ff" />
@@ -1074,9 +1214,57 @@ export default function OutdoorTracker() {
               </Pressable>
               <Pressable onPress={handleFinishConfirm} style={({ pressed }) => [styles.finishModalPrimaryAction, pressed && styles.buttonPressed]}>
                 <Ionicons name="flash" size={16} color="#06111f" />
-                <Text style={styles.finishModalPrimaryActionText}>Claim XP</Text>
+                <Text style={styles.finishModalPrimaryActionText}>Save session</Text>
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={routePreviewVisible && !!finishSummary}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRoutePreviewVisible(false)}
+      >
+        <View style={styles.routePreviewOverlay}>
+          <View style={styles.routePreviewCard}>
+            <View style={styles.routePreviewHeader}>
+              <Text style={styles.routePreviewTitle}>Route Preview</Text>
+              <Pressable onPress={() => setRoutePreviewVisible(false)} style={({ pressed }) => [styles.routePreviewCloseBtn, pressed && styles.buttonPressed]}>
+                <Ionicons name="close" size={16} color="#dff8ff" />
+              </Pressable>
+            </View>
+            {finishSummary?.routeSparkline ? (
+              <Svg width="280" height="170" viewBox="0 0 280 170">
+                <SvgPolyline
+                  points={String(finishSummary?.routeSparkline || '')
+                    .split(' ')
+                    .map((pair) => {
+                      const [xStr, yStr] = pair.split(',');
+                      const x = Number(xStr);
+                      const y = Number(yStr);
+                      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+                      return `${(x * 2.2 + 6).toFixed(1)},${(y * 2.9 + 4).toFixed(1)}`;
+                    })
+                    .filter(Boolean)
+                    .join(' ')}
+                  fill="none"
+                  stroke="#00eaff"
+                  strokeWidth="4"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </Svg>
+            ) : (
+              <View style={styles.routePreviewEmptyState}>
+                <Ionicons name="map-outline" size={26} color="#7ca3db" />
+                <Text style={styles.routePreviewEmptyText}>No route captured for this session yet.</Text>
+              </View>
+            )}
+            <Text style={styles.routePreviewMeta}>
+              {Number(finishSummary?.distanceKm || 0).toFixed(1)} km · {finishSummary?.avgPace || '--'} · {finishSummary?.avgSpeed || '--'}
+            </Text>
           </View>
         </View>
       </Modal>
@@ -1629,6 +1817,72 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 6,
   },
+  finishModalRouteCard: {
+    marginTop: 12,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+  },
+  finishModalRouteLabel: {
+    alignSelf: 'flex-start',
+    color: '#88a3d9',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  finishModalRouteHint: {
+    color: '#8eb2ff',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+    alignSelf: 'flex-end',
+  },
+  finishModalRouteEmpty: {
+    width: 120,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  finishModalRouteEmptyText: {
+    color: '#9fb3ff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  finishModalSplitsBlock: {
+    marginTop: 12,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 6,
+  },
+  finishModalSplitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  finishModalSplitKm: {
+    color: '#c6d7ff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  finishModalSplitPace: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   finishModalNote: {
     color: '#9fb3ff',
     fontSize: 12,
@@ -1688,5 +1942,67 @@ const styles = StyleSheet.create({
     color: '#06111f',
     fontSize: 13,
     fontWeight: '900',
+  },
+  routePreviewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(3,6,16,0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  routePreviewCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
+    backgroundColor: '#0b1224',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  routePreviewHeader: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  routePreviewTitle: {
+    color: '#e6f7ff',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  routePreviewCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routePreviewMeta: {
+    color: '#9fb3ff',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  routePreviewEmptyState: {
+    width: 280,
+    height: 170,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  routePreviewEmptyText: {
+    color: '#9fb3ff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
