@@ -37,6 +37,16 @@ Instead of treating exercise like a static checklist, Bodify makes activity feel
 | **Exercise Catalog** | Searchable exercise database powered by ExerciseDB / RapidAPI |
 | **Battle Replay** | Replay workout sessions as battle-style animations |
 
+## Recent updates (June 2026)
+
+- Merged Kudos actions into the leaderboard flow with send-state and budget feedback.
+- Added compact Home kudos chip and layout refinements for better mobile density.
+- Added delivery-style avatar marker rendering on outdoor maps (native + web).
+- Upgraded Outdoor Tracker finish flow with richer post-session summary metrics.
+- Added finish-summary route preview with expandable modal and fallback empty states.
+- Improved Workout screen flow (sample workout placement, header layout, tab-safe scrolling).
+- Hardened Strava integration with stronger token handling, connection checks, import dedupe, and disconnect action.
+
 ## Tech stack
 
 - **Expo SDK 52** with **Expo Router**
@@ -108,7 +118,8 @@ Copy `.env.example` to `.env` and configure the keys relevant to your setup.
 | `EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST/PORT` | Local Functions emulator |
 | `SPOONACULAR_API_KEY` | Meal and diet search |
 | `EXERCISEDB_API_KEY` | Exercise catalog via RapidAPI |
-| `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` | Strava OAuth and sync |
+| `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` | Primary Strava OAuth and sync credentials |
+| `EXPO_PUBLIC_STRAVA_CLIENT_ID` / `EXPO_PUBLIC_STRAVA_CLIENT_SECRET` | Optional fallback keys for local/dev resolution |
 | `EXPO_PUBLIC_GOOGLE_MAPS_WEB_API_KEY` | Web maps |
 | `GOOGLE_MAPS_ANDROID_API_KEY` | Android maps |
 
@@ -167,7 +178,7 @@ npx jest --no-coverage --verbose
 
 | Provider | Status |
 |---|---|
-| Strava | Live — OAuth + activity sync |
+| Strava | Live — OAuth, refresh handling, activity import, duplicate protection, connect/disconnect UX |
 | Garmin | Placeholder UI |
 | Fitbit | Placeholder UI |
 | Apple Health | Placeholder UI |
