@@ -45,6 +45,8 @@ Instead of treating exercise like a static checklist, Bodify makes activity feel
 - Upgraded Outdoor Tracker finish flow with richer post-session summary metrics.
 - Added finish-summary route preview with expandable modal and fallback empty states.
 - Improved Workout screen flow (sample workout placement, header layout, tab-safe scrolling).
+- Updated Calendar screen flow and related progress presentation for a cleaner daily planning experience.
+- Updated Diet screen UX and nutrition flow integration for more consistent meal-tracking behavior.
 - Hardened Strava integration with stronger token handling, connection checks, import dedupe, and disconnect action.
 
 ## Tech stack
